@@ -103,6 +103,8 @@ Validate:
 - scoring logic
 - diagnostic output
 - regression detection and reporting
+- separation between deterministic calculators and agent-judge outputs
+- per-case artifact generation and report completeness
 
 ### For prompt or policy changes
 
@@ -155,6 +157,28 @@ When building features that affect output quality:
 
 If a feature cannot yet be measured systematically, note the gap and suggest the smallest credible eval to add next.
 
+Developer evals should generally include:
+
+- a prompt
+- a normalized spec
+- ground-truth STEP
+- optional reference image
+- optional tolerances
+- tags
+
+Preferred dataset families include:
+
+- `basic_shapes`
+- `feature_shapes`
+- `reference_parts`
+
+Eval outputs should usually include:
+
+- deterministic metrics JSON
+- judge outputs JSON
+- short markdown summary
+- per-case artifacts and aggregated reports when applicable
+
 ## Billing and cost discipline
 
 This system may incur cost through model calls, rendering, and repeated tool execution.
@@ -201,6 +225,8 @@ Ask before:
 - the v1 harness should be multi-agent but intentionally small and controlled
 - the manager maintains the active fit, form, and function spec and routes work, but should not do heavy CAD authoring directly
 - preserve the distinction between the internal Review Specialist loop and the Eval Specialist benchmarking/CI role
+- maintain a separate high-level `formloop` operator CLI for app lifecycle, runs, evals, diagnostics, and updates
+- standardize authoritative, presentation, internal-review, and eval artifacts early
 
 ## Internal review loop expectations
 

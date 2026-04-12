@@ -192,6 +192,64 @@ Suggested v1 skills:
 - `eval_execution`
 - `reference_image_review`
 
+## High-level application CLI specification
+
+Formloop should expose a separate operator CLI.
+
+```bash
+formloop ui start
+formloop ui stop
+formloop ui status
+formloop run "..."
+formloop eval run datasets/basic_shapes
+formloop eval report latest
+formloop doctor
+formloop update
+```
+
+This CLI is for:
+
+- application lifecycle
+- running agent queries outside the UI
+- batch eval execution
+- health checks
+- updating the application
+
+The conceptual split remains:
+
+- `cad-cli` provides the deterministic `cad` command surface
+- Formloop provides orchestration and application lifecycle
+
+## Artifact model
+
+The system should standardize artifacts early.
+
+### Authoritative artifacts
+
+- STEP
+- source model
+- metadata JSON
+
+### Presentation artifacts
+
+- GLB
+- per-view PNGs
+- render sheet PNG
+
+### Internal review artifacts
+
+- review summary JSON
+- review notes
+- measurement outputs
+- optional reference-image comparison outputs
+
+### Eval artifacts
+
+- per-case outputs
+- compare metrics
+- judge outputs
+- aggregated reports
+
 ## Human interface specification
 
 The UI should feel like a design review workspace, not a trace console.
@@ -399,6 +457,97 @@ Typical uses:
 - thickness checks
 - hole diameters
 - center distances
+
+## Developer eval specification
+
+Developer evals are different from normal user runs because here there is ground-truth geometry and the goal is repeatable benchmarking.
+
+These evals should be less agentic by default than the normal design loop, but they may still use an agent judge that performs multiple tool calls if that improves evaluation quality.
+
+### Purpose of developer evals
+
+Developer evals answer questions like:
+
+- did the system generate the right geometry from the prompt
+- how close is candidate geometry to ground truth
+- did the system include all required features
+- are key dimensions accurate
+- are regressions appearing over time
+
+### Dataset structure
+
+Each case should contain:
+
+- prompt
+- normalized spec
+- ground-truth STEP
+- optional reference image
+- optional tolerances
+- tags
+
+Suggested datasets:
+
+- `basic_shapes`
+- `feature_shapes`
+- `reference_parts`
+
+### Eval scoring model
+
+Eval scoring should combine two classes of evaluators.
+
+#### A. Deterministic calculators
+
+These produce hard metrics from geometry and artifacts.
+
+Examples:
+
+- shared volume
+- only-in-truth volume
+- only-in-candidate volume
+- IoU or overlap ratio
+- alignment residual
+- bounding-box delta
+- exact dimension deltas for named measurements
+- artifact presence and completeness
+
+These should be the foundation of objective regression tracking.
+
+#### B. Agent eval judges
+
+These produce higher-level quality assessments that are difficult to express as a single deterministic formula.
+
+Examples:
+
+- adherence to user spec
+- presence of all critical features
+- plausibility of overall geometry
+- whether key requested details were omitted
+- whether the generated result appears materially acceptable despite small geometric deviation
+- reference image similarity assessment at a semantic level
+
+These agent judges can be simple or tool-using.
+
+### Tool-using eval judges
+
+The eval routine is less agentic by default, but it is reasonable to allow an LLM judge to use tools to complete an evaluation goal.
+
+For example, an eval judge for dimensional compliance might:
+
+- inspect bounding box
+- measure hole spacing
+- measure thickness
+- compare those values to spec tolerances
+- return a structured dimensional compliance score
+
+So the eval judge may be agentic in implementation, even though the overall eval framework is not an open-ended design loop.
+
+### Eval outputs
+
+Each eval case should produce:
+
+- deterministic metrics JSON
+- judge outputs JSON
+- short markdown summary
 
 ## Relationship to cad-cli
 
