@@ -548,6 +548,131 @@ Each eval case should produce:
 - deterministic metrics JSON
 - judge outputs JSON
 - short markdown summary
+- artifact bundle
+- pass/fail or score status
+
+Each batch eval should produce:
+
+- aggregate metric summary
+- per-dataset summary
+- failure shortlist
+- trend-ready outputs for CI
+
+## Recommended eval dimensions
+
+### Run success
+
+- did the system complete
+- were required artifacts produced
+
+### Deterministic geometric accuracy
+
+- overlap metrics
+- only-in-truth
+- only-in-candidate
+- alignment quality
+- measured dimension deltas
+
+### Structured quality judgment
+
+- spec adherence score
+- feature completeness score
+- dimensional compliance score
+- reference-image consistency score when applicable
+
+### Artifact completeness
+
+- render success
+- packaging completeness
+- source and metadata presence
+
+## CI integration
+
+GitHub Actions on push to `main` should:
+
+- run a batch eval suite
+- publish aggregate results
+- attach failed-case artifacts
+- surface regressions clearly
+
+A smaller smoke subset should run on PRs.
+
+CI results should combine:
+
+- deterministic calculator outputs
+- agent judge outputs
+
+That gives both objective numeric regressions and higher-level quality assessment.
+
+## Run lifecycle
+
+### Normal user run
+
+A normal user run should look like this:
+
+1. user provides design request, optionally with a reference image
+2. manager writes or updates current spec
+3. manager invokes Design Researcher if needed
+4. manager invokes CAD Designer to create or revise geometry
+5. geometry is exported to STEP and GLB
+6. Render Specialist produces preview outputs
+7. Review Specialist evaluates the current candidate against the spec, inspection results, renders, and any reference image
+8. if needed, Review Specialist sends revision feedback back to CAD Designer
+9. loop continues until stop criteria are met
+10. UI updates current spec, latest geometry, review summary, and artifacts
+
+### Developer eval run
+
+A developer eval run should look like this:
+
+1. load dataset case
+2. run generation from prompt/spec
+3. produce artifacts
+4. run deterministic compare and measurement calculators against ground truth
+5. run structured agent judges
+6. aggregate scores
+7. publish per-case and batch outputs
+
+## Non-goals for the core version
+
+The core version should not try to do all of these at once:
+
+- manufacturing or slicing validation in the main loop
+- distributed execution
+- multiple modeling backends
+- highly decomposed micro-repo tool architecture
+- advanced publishing pipelines
+- technical drawing workflows as the default user path
+
+## Optional addendum: 3D printing validation
+
+This remains intentionally outside the core design.
+
+If added later, the right extension point is:
+
+```bash
+cad validate ...
+```
+
+This should be downstream from the core design loop and optional.
+
+A future two-layer approach could include:
+
+- a geometry-aware pre-analysis layer
+- a slicer-backed validation layer, with PrusaSlicer as the portable default and Bambu Studio as an optional target-specific second pass
+
+For a future MVP, the most useful validation signals would be:
+
+- unsupported overhang area
+- bridge risk
+- mid-air islands
+- support-contact pain proxy
+
+If added later, this should appear in three places:
+
+- `cad validate` in the CLI
+- an optional Printability panel in the UI
+- an optional manufacturability score bucket in evals
 
 ## Relationship to cad-cli
 

@@ -177,7 +177,23 @@ Eval outputs should usually include:
 - deterministic metrics JSON
 - judge outputs JSON
 - short markdown summary
+- artifact bundle
+- pass/fail or score status
 - per-case artifacts and aggregated reports when applicable
+
+Each batch eval should usually produce:
+
+- aggregate metric summary
+- per-dataset summary
+- failure shortlist
+- trend-ready outputs for CI
+
+Recommended eval dimensions:
+
+- run success
+- deterministic geometric accuracy
+- structured quality judgment
+- artifact completeness
 
 ## Billing and cost discipline
 
@@ -227,6 +243,8 @@ Ask before:
 - preserve the distinction between the internal Review Specialist loop and the Eval Specialist benchmarking/CI role
 - maintain a separate high-level `formloop` operator CLI for app lifecycle, runs, evals, diagnostics, and updates
 - standardize authoritative, presentation, internal-review, and eval artifacts early
+- CI on `main` should run meaningful batch evals, while PRs should run a smaller smoke subset
+- keep manufacturing and slicer validation outside the core loop unless and until `cad validate` is intentionally added
 
 ## Internal review loop expectations
 
