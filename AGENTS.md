@@ -81,6 +81,8 @@ Validate:
 - internal review outputs
 - retry/revision logic where relevant
 - persistence of run state and artifacts
+- manager behavior stays focused on spec management and routing, not heavy CAD authoring
+- distinction between Review Specialist and Eval Specialist remains intact
 
 ### For artifact pipeline changes
 
@@ -110,6 +112,7 @@ Do not stop at “it sounds better.” Validate:
 - failure/recovery behavior
 - review loop quality
 - any measurable effect on eval results if possible
+- whether the normalized spec, review findings, and revision instructions became more actionable
 
 ## Closed-loop development workflow
 
@@ -198,6 +201,41 @@ Ask before:
 - the v1 harness should be multi-agent but intentionally small and controlled
 - the manager maintains the active fit, form, and function spec and routes work, but should not do heavy CAD authoring directly
 - preserve the distinction between the internal Review Specialist loop and the Eval Specialist benchmarking/CI role
+
+## Internal review loop expectations
+
+In normal user design runs, there is usually no ground-truth STEP file.
+
+The Review Specialist should therefore judge candidates against:
+
+- the normalized current spec
+- the produced geometry
+- the rendered outputs
+- optional user-provided reference images
+- deterministic inspections from `cad inspect`
+- optional comparison artifacts when a second geometry or proxy is available
+
+The goal is not exact truth matching. The goal is deciding whether the current candidate appears good enough to stop or should be revised again.
+
+Expected review mechanisms include:
+
+- spec compliance review
+- dimensional spot-checks
+- feature presence checks
+- reference-image review
+- render-based visual review
+
+Expected structured review output includes:
+
+- overall pass or revise
+- confidence
+- key findings
+- missing or suspect features
+- suspect dimensions to re-check
+- reference-image mismatch notes
+- revision instructions for the CAD Designer
+
+The review loop is allowed to be iterative and tool-using. A good review agent may inspect dimensions, request more views, compare silhouettes, and only then decide whether to revise.
 
 ## Skill expectations
 

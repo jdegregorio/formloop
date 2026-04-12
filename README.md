@@ -243,7 +243,162 @@ These should remain collapsed by default:
 
 ## Internal design loop
 
-During a normal user design run, there is usually no ground-truth STEP file. The system therefore needs an internal review loop that judges the candidate against the active spec, available measurements and inspections, rendered outputs, and any provided reference images.
+During a normal user design run, there is usually no ground-truth STEP file. The system therefore needs an internal review loop that judges the candidate against:
+
+- the normalized current spec
+- the produced geometry
+- the rendered outputs
+- optionally a reference image supplied by the user
+
+### Goal of the internal review loop
+
+The goal is not to match truth geometry.
+
+The goal is: does the current candidate appear to satisfy the requested fit, form, and function well enough to stop, or should the agent revise again?
+
+### Inputs to internal review
+
+The Review Specialist may use:
+
+- current spec summary
+- latest model metadata
+- render sheet and view images
+- basic deterministic inspections from `cad inspect`
+- optional `cad compare` against a user-provided reference image derivative or later a proxy geometry
+- optional user-provided reference image directly
+
+### Closed-loop review tools
+
+The internal loop should support at least these review mechanisms:
+
+#### Spec compliance review
+
+Check whether requested features seem present and whether the design appears aligned with the normalized spec.
+
+#### Dimensional spot-checks
+
+Request deterministic measurements through `cad inspect` or geometry queries to validate key dimensions.
+
+#### Feature presence checks
+
+Confirm that holes, chamfers, rounds, pockets, bosses, tabs, or other expected features appear to exist.
+
+#### Reference image review
+
+If the user provides a reference image, compare the rendered outputs against that image as part of closed-loop review. This is not exact geometric truth, but it is still useful for catching gross shape mismatch, missing features, wrong proportions, wrong silhouette, and wrong orientation.
+
+#### Render-based visual review
+
+Use the latest front, right, top, and iso renders to assess whether the candidate looks coherent and complete.
+
+### Internal review outputs
+
+The Review Specialist should produce a structured review result such as:
+
+- overall pass or revise
+- confidence
+- key findings
+- missing or suspect features
+- suspect dimensions to re-check
+- reference-image mismatch notes
+- revision instructions for the CAD Designer
+
+### Important boundary
+
+This internal review loop is still agentic.
+
+It can use multiple tool calls and multiple passes when needed.
+
+For example, the review agent might:
+
+- inspect overall bounding box
+- inspect hole diameters
+- re-render an alternate camera view
+- compare render silhouette to a reference image
+- then decide whether to revise geometry
+
+So the design loop can be iterative and tool-using, even though it does not have ground-truth geometry.
+
+## Deterministic CLI specification for cad-cli
+
+The external contract should be simple and unified.
+
+```bash
+cad build ...
+cad render ...
+cad compare ...
+cad inspect ...
+cad package ...
+```
+
+### `cad build`
+
+Purpose: execute or parameterize a `build123d` model and emit standard artifacts.
+
+Inputs may include:
+
+- model source
+- parameter file
+- working directory
+- output directory
+
+Outputs should include:
+
+- STEP
+- GLB
+- metadata
+- optionally STL
+- optionally normalized source snapshot
+
+### `cad render`
+
+Purpose: render a GLB model into deterministic preview assets using Blender.
+
+Inputs may include:
+
+- GLB path
+- render spec
+- output directory
+
+Outputs should include:
+
+- front view
+- right view
+- top view
+- iso view
+- composite contact sheet
+- render metadata
+
+### `cad compare`
+
+Purpose: compare two geometries when two geometries are available.
+
+Typical uses:
+
+- candidate vs ground truth in evals
+- candidate vs prior revision
+- candidate vs imported reference geometry
+- optional future derived geometry comparisons
+
+Outputs should include:
+
+- metrics JSON
+- short summary
+- overlap metrics
+- optional diff solids or meshes
+- optional visual review assets
+
+### `cad inspect`
+
+Purpose: provide lightweight deterministic inspection without requiring full comparison.
+
+Typical uses:
+
+- bounding box
+- overall dimensions
+- thickness checks
+- hole diameters
+- center distances
 
 ## Relationship to cad-cli
 
