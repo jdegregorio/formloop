@@ -1,5 +1,7 @@
 ## Requirements specification for Formloop
 
+**Important**: Keep each requirement status up to date during development.  Include comments that reference requirements in-code wherever possible.
+
 ### Functional requirements
 
 | ID       | Requirement                                                                                                                                                                              | Rationale                                                                                     | Status   |
