@@ -22,23 +22,28 @@ Do not treat agent output, rendered previews, or passing unit tests as sufficien
 
 ## Core operating rules
 
-1. **Evidence beats confidence**
+1. **Root spec files are source of truth**
+   - Always check the repository root for `spec.md` and `requirements.md` before implementing non-trivial work.
+   - Follow those files closely when they exist.
+   - If repo docs conflict, treat `requirements.md` and `spec.md` as higher priority unless explicitly told otherwise.
+
+2. **Evidence beats confidence**
    - Never claim a feature works without validation evidence.
    - Prefer measured results, captured artifacts, and regression checks over narrative summaries.
 
-2. **The loop matters as much as the generation**
+3. **The loop matters as much as the generation**
    - Formloop is not just a one-shot CAD generator.
    - Preserve the review, critique, revision, and reevaluation cycle as a first-class product behavior.
 
-3. **Keep app logic and deterministic CAD logic separate**
+4. **Keep app logic and deterministic CAD logic separate**
    - Geometry build/render/compare primitives belong in `cad-cli`.
    - Formloop should orchestrate them, not quietly duplicate them.
 
-4. **Traceability is a product feature**
+5. **Traceability is a product feature**
    - Maintain clear links between prompt/spec, intermediate state, generated artifacts, validation outcomes, and final outputs.
    - A good run should be inspectable after the fact.
 
-5. **Optimize for maintainability over demo magic**
+6. **Optimize for maintainability over demo magic**
    - Avoid hidden prompts, ad hoc glue, or fragile state that only works in one golden path.
 
 ## Definition of done
@@ -54,6 +59,7 @@ That typically means:
 - review/feedback signals are surfaced correctly
 - failure cases are handled and demonstrated where practical
 - docs or operator-facing guidance are updated when behavior changes
+- `requirements.md` is updated to reflect the latest status of affected requirements when that file exists
 - billing or cost implications are noted when model/tool usage changes materially
 
 If you cannot prove part of the loop, say so explicitly.
@@ -306,6 +312,17 @@ Suggested v1 skill areas:
 - `eval_execution`
 - `reference_image_review`
 
+## Requirements tracking
+
+When `requirements.md` exists in the repo root:
+
+- treat it as the canonical checklist for what counts as done
+- consult it before starting meaningful implementation work
+- update the status field of each affected requirement as development progresses
+- mark requirements completed only when implementation and validation both support that claim
+- keep requirement statuses honest; do not mark something done because most of it exists
+- if work is partial, reflect partial status clearly rather than collapsing nuance
+
 ## Good agent behavior
 
 - keep diffs focused
@@ -315,6 +332,7 @@ Suggested v1 skill areas:
 - flag uncertainty instead of bluffing
 - preserve architectural boundaries
 - keep the UI oriented toward design review rather than raw trace output by default
+- use `requirements.md` as the single source of truth for completion status when available
 
 ## Bad agent behavior
 
