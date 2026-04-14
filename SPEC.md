@@ -121,13 +121,24 @@ Formloop should prioritize:
 * repeatable eval orchestration
 * strong separation between product workflow and deterministic tooling
 
-## Recommended handoff between repos
+### Relationship with `cad-cli`
 
+#### Basic Summary
 The cleanest mental model is:
 
 **Formloop asks questions and manages decisions.**
-**`cad-cli` performs deterministic CAD work and returns artifacts plus structured results.**
+**`cad-cli` performs deterministic CAD work and returns artifacts plus structured results (as a skill)**
 
+
+##### `cad-cli`
+
+A reusable, deterministic CAD tool product that owns build, render, inspect, compare, and package operations, standardized around build123d, Blender, STEP, and GLB. It is headless, scriptable, CI-friendly, and usable outside Formloop.  
+
+##### Formloop
+
+An agentic application that owns the manager/specialist harness, current design state, internal closed-loop review, developer eval orchestration, the UI, and the `formloop` application CLI. It uses `cad-cli` as its deterministic execution substrate. 
+
+#### Normal Flow/Handoffs
 A normal flow should look like this:
 
 1. Formloop receives a request.
@@ -137,17 +148,3 @@ A normal flow should look like this:
 5. Formloop invokes `cad inspect` as needed for review.
 6. Formloop may invoke `cad compare` in developer evals or revision comparison flows.
 7. Formloop presents outputs, decides whether to revise, and records state. 
-
-## Practical summary
-
-If you want the earlier project-level spec rewritten as two repo-owned scopes, the shortest version is:
-
-### `cad-cli`
-
-A reusable, deterministic CAD tool product that owns build, render, inspect, compare, and package operations, standardized around build123d, Blender, STEP, and GLB. It is headless, scriptable, CI-friendly, and usable outside Formloop.  
-
-### Formloop
-
-An agentic application that owns the manager/specialist harness, current design state, internal closed-loop review, developer eval orchestration, the UI, and the `formloop` application CLI. It uses `cad-cli` as its deterministic execution substrate. 
-
-If you want, I can next turn this into a **repo charter document** for each repo, with sections like mission, in-scope, out-of-scope, interfaces, and ownership.
