@@ -23,9 +23,9 @@ Do not treat agent output, rendered previews, or passing unit tests as sufficien
 ## Core operating rules
 
 1. **Root spec files are source of truth**
-   - Always check the repository root for `spec.md` and `requirements.md` before implementing non-trivial work.
+   - Always check the repository root for `SPEC.md`, `REQUIREMENTS_HARNESS.md`, and `REQUIREMENTS_UI.md` before implementing non-trivial work.
    - Follow those files closely when they exist.
-   - If repo docs conflict, treat `requirements.md` and `spec.md` as higher priority unless explicitly told otherwise.
+   - If repo docs conflict, treat the requirements files and `SPEC.md` as higher priority unless explicitly told otherwise.
 
 2. **Evidence beats confidence**
    - Never claim a feature works without validation evidence.
@@ -59,7 +59,7 @@ That typically means:
 - review/feedback signals are surfaced correctly
 - failure cases are handled and demonstrated where practical
 - docs or operator-facing guidance are updated when behavior changes
-- `requirements.md` is updated to reflect the latest status of affected requirements when that file exists
+- `REQUIREMENTS_HARNESS.md` and/or `REQUIREMENTS_UI.md` are updated to reflect the latest status of affected requirements
 - billing or cost implications are noted when model/tool usage changes materially
 
 If you cannot prove part of the loop, say so explicitly.
@@ -314,10 +314,10 @@ Suggested v1 skill areas:
 
 ## Requirements tracking
 
-When `requirements.md` exists in the repo root:
+Requirements are split across two files in the repo root: `REQUIREMENTS_HARNESS.md` covers the agent harness, runtime, CLI, and evals; `REQUIREMENTS_UI.md` covers the user-facing web UI. Treat them together as the canonical checklist:
 
-- treat it as the canonical checklist for what counts as done
-- consult it before starting meaningful implementation work
+- treat them as the canonical checklist for what counts as done
+- consult the relevant file(s) before starting meaningful implementation work
 - update the status field of each affected requirement as development progresses
 - mark requirements completed only when implementation and validation both support that claim
 - keep requirement statuses honest; do not mark something done because most of it exists
@@ -332,7 +332,7 @@ When `requirements.md` exists in the repo root:
 - flag uncertainty instead of bluffing
 - preserve architectural boundaries
 - keep the UI oriented toward design review rather than raw trace output by default
-- use `requirements.md` as the single source of truth for completion status when available
+- use `REQUIREMENTS_HARNESS.md` and `REQUIREMENTS_UI.md` as the source of truth for completion status
 
 ## Bad agent behavior
 
