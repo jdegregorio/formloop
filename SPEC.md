@@ -46,7 +46,9 @@ Formloop should use the manager-plus-specialists structure already agreed:
 
 The key conceptual split inside Formloop is between two different review modes.
 
-**Internal design-loop review** is for normal user runs with no ground-truth geometry. It should evaluate the latest candidate against the normalized spec, rendered views, deterministic inspections, and optional user-provided reference images. It can be iterative and tool-using. 
+**Internal design-loop review** is for normal user runs with no ground-truth geometry. It should evaluate the latest candidate against the normalized spec, rendered views, deterministic inspections, and optional user-provided reference images. It can be iterative and tool-using.
+
+The rendered PNG views are passed to the review/judge LLMs as **multimodal image inputs**, and the core visual comparison is between those rendered images and (a) the normalized spec and (b) any user-provided reference image. The rendered images are managed as durable per-run, per-revision artifacts so the review loop, evals, and UI all consume the same underlying files. 
 
 **Developer eval review** is for benchmarking runs where ground-truth geometry exists. It should combine deterministic calculators with agent judges, and may allow tool-using judges when needed for structured assessments like dimensional compliance. 
 
