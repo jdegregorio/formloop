@@ -46,7 +46,9 @@ Formloop should use the manager-plus-specialists structure already agreed:
 
 The key conceptual split inside Formloop is between two different review modes.
 
-**Internal design-loop review** is for normal user runs with no ground-truth geometry. It should evaluate the latest candidate against the normalized spec, rendered views, deterministic inspections, and optional user-provided reference images. It can be iterative and tool-using. 
+**Internal design-loop review** is for normal user runs with no ground-truth geometry. It should evaluate the latest candidate against the normalized spec, rendered views, deterministic inspections, and optional user-provided reference images. It can be iterative and tool-using.
+
+The rendered PNG views are passed to the review/judge LLMs as **multimodal image inputs**, and the core visual comparison is between those rendered images and (a) the normalized spec and (b) any user-provided reference image. The rendered images are managed as durable per-run, per-revision artifacts so the review loop, evals, and UI all consume the same underlying files. 
 
 **Developer eval review** is for benchmarking runs where ground-truth geometry exists. It should combine deterministic calculators with agent judges, and may allow tool-using judges when needed for structured assessments like dimensional compliance. 
 
@@ -54,13 +56,18 @@ That distinction belongs in Formloop, not in `cad-cli`, because it is fundamenta
 
 ### UI responsibilities
 
+The UI is a mostly independent build that integrates with the harness through its programmatic interface. Detailed UI requirements live in `REQUIREMENTS_UI.md`; harness-side requirements live in `REQUIREMENTS_HARNESS.md`.
+
 Formloop should present a design-review workspace with these primary surfaces:
 
 * chat
 * current spec
-* latest geometry views
+* an interactive GLB viewer for the latest candidate geometry (browser-native, Three.js via `GLTFLoader` as the recommended default, or `<model-viewer>` for a lighter option)
+* the harness-produced multi-view render sheet as a secondary reference alongside the interactive viewer
 * latest review summary
 * artifact downloads
+
+The interactive GLB viewer is the primary human-facing surface for geometry. The multi-view render sheet remains a first-class artifact because it is still the strongest visual signal for the agent-driven closed-loop review and is useful for human cross-reference. CAD-accurate measurement and feature interrogation belong on the harness side against STEP; the browser viewer is for mesh-level presentation only.
 
 Detailed logs, tool calls, subagent history, and raw traces should exist, but remain collapsed by default. This keeps the UI intuitive while still making the system inspectable. 
 
@@ -108,6 +115,10 @@ Each eval run should combine:
 * structured agent-judge outputs
 
 That means Formloop owns the policy and orchestration for eval scoring, aggregation, CI reporting, and failure surfacing, even though it relies on `cad-cli` for deterministic geometry operations. 
+
+### Skills
+
+Formloop's skill system shall comply with the open Agent Skills standard ([agentskills.io](https://agentskills.io/home); see also OpenAI's tools/skills guide at [developers.openai.com](https://developers.openai.com/api/docs/guides/tools-skills)). Aligning with an open standard preserves interoperability across agent platforms and reduces lock-in to any single vendor's skill format.
 
 ### Quality expectations
 
