@@ -1,2 +1,0 @@
-[console_scripts]
-formloop = formloop.cli:app
