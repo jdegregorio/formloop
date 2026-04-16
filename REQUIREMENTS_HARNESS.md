@@ -60,7 +60,7 @@
 
 | ID         | Requirement                                                                                                                      | Rationale                                                                                   | Status   |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------- |
-| FLH-NF-001 | The harness shall prioritize safe and reliable execution over maximal autonomy.                                                  | Safety and reliability are explicit project objectives.                                     | Proposed |
+| FLH-NF-001 | The harness shall enable maximal autonomy while maintaining safety and reliability.                                                  | Safety and reliability are explicit project objectives.                                     | Proposed |
 | FLH-NF-002 | The harness shall emit intermediate progress updates during multi-step runs in a form suitable for streaming consumption.        | Progress visibility is required by the UI and by operator tooling.                          | Proposed |
 | FLH-NF-003 | The harness shall preserve artifact traceability across runs, revisions, review steps, and eval results.                         | Traceability is a cross-cutting design objective.                                           | Proposed |
 | FLH-NF-004 | The harness shall support reproducible eval execution for regression tracking.                                                   | Developer evals must be usable as a stable quality bar over time.                           | Proposed |
