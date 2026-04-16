@@ -1,0 +1,15 @@
+case_id: basic_block
+prompt: Create a block width 40 height 20 depth 10 for a mounting spacer.
+normalized_spec:
+  summary: Create a CAD model that satisfies the request.
+  fit: []
+  form: ["block"]
+  function: ["support mounting"]
+  constraints: []
+  blocking_gaps: []
+  key_dimensions: ["width=40mm", "height=20mm", "depth=10mm"]
+ground_truth_step: truth.step
+tolerances:
+  iou_proxy: 0.7
+tags: ["basic", "block"]
+

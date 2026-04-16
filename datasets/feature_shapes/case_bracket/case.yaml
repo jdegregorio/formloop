@@ -1,0 +1,15 @@
+case_id: feature_bracket
+prompt: Create a bracket for an M3 fastener mount width 40 height 30 thickness 5.
+normalized_spec:
+  summary: Create a CAD model that satisfies the request.
+  fit: []
+  form: ["bracket"]
+  function: ["support mounting"]
+  constraints: ["use M3-compatible features"]
+  blocking_gaps: []
+  key_dimensions: ["width=40mm", "height=30mm", "thickness=5mm"]
+ground_truth_step: truth.step
+tolerances:
+  iou_proxy: 0.6
+tags: ["feature", "bracket", "m3"]
+

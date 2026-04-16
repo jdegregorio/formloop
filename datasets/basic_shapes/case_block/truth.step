@@ -1,0 +1,12 @@
+{
+  "shape": "block",
+  "dims": {
+    "width": 40,
+    "height": 20,
+    "depth": 10
+  },
+  "features": [
+    "base solid"
+  ]
+}
+

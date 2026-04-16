@@ -1,0 +1,41 @@
+[app]
+name = "formloop"
+run_store = ".formloop"
+default_profile = "normal"
+api_host = "127.0.0.1"
+api_port = 8040
+cad_command = "cad"
+llm_backend = "openai_agents"
+ui_server_import = "formloop.api.app:create_app"
+
+[profiles.normal]
+provider = "openai_responses"
+model = "gpt-5.4"
+thinking = "high"
+
+[profiles.dev_test]
+provider = "openai_responses"
+model = "gpt-5.4-nano"
+thinking = "low"
+
+[profiles.eval]
+provider = "openai_responses"
+model = "gpt-5.4"
+thinking = "high"
+
+[profiles.anthropic_normal]
+provider = "litellm"
+model = "anthropic/claude-sonnet-4-5"
+thinking = "high"
+
+[skills]
+builtin_dir = "src/formloop/builtin_skills"
+
+[runtime]
+max_review_revisions = 2
+load_dotenv = true
+dotenv_file = ".env.local"
+
+[datasets]
+root = "datasets"
+

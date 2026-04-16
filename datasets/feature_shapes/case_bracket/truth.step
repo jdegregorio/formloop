@@ -1,0 +1,15 @@
+{
+  "shape": "bracket",
+  "dims": {
+    "width": 40,
+    "height": 30,
+    "thickness": 5,
+    "hole_diameter": 3.2
+  },
+  "features": [
+    "base solid",
+    "mounting holes",
+    "right-angle flange"
+  ]
+}
+

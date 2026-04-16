@@ -2,3 +2,8 @@
 .env.local
 .env.*
 !.env.example
+.coverage
+.pytest_cache/
+.formloop*/
+coverage.xml
+__pycache__/

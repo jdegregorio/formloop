@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+
+def parse_model_source(path: Path) -> dict:
+    text = path.read_text(encoding="utf-8")
+    shape = re.search(r"# formloop-shape: (.+)", text)
+    dims = re.search(r"# formloop-dims: (.+)", text)
+    features = re.search(r"# formloop-features: (.+)", text)
+    return {
+        "shape": shape.group(1).strip() if shape else "block",
+        "dims": json.loads(dims.group(1)) if dims else {"width": 40, "height": 20, "depth": 10},
+        "features": json.loads(features.group(1)) if features else [],
+    }
+
+
+def write_image(path: Path, label: str) -> None:
+    image = Image.new("RGB", (320, 240), (248, 248, 248))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((40, 40, 280, 200), outline=(40, 40, 40), width=3)
+    draw.text((60, 100), label, fill=(20, 20, 20))
+    image.save(path)
+
+
+def cmd_build(args: argparse.Namespace) -> None:
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    parsed = parse_model_source(Path(args.model_source))
+    step_path = output_dir / "model.step"
+    glb_path = output_dir / "model.glb"
+    metadata_path = output_dir / "metadata.json"
+    step_payload = {"shape": parsed["shape"], "dims": parsed["dims"], "features": parsed["features"]}
+    step_path.write_text(json.dumps(step_payload, indent=2), encoding="utf-8")
+    glb_path.write_text("placeholder glb", encoding="utf-8")
+    metadata_path.write_text(json.dumps(step_payload, indent=2), encoding="utf-8")
+    print(json.dumps({"step_path": str(step_path), "glb_path": str(glb_path), "metadata_path": str(metadata_path)}))
+
+
+def cmd_render(args: argparse.Namespace) -> None:
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    view_paths = []
+    for view in ["front", "right", "top", "iso"]:
+        path = output_dir / f"{view}.png"
+        write_image(path, f"{view} view")
+        view_paths.append(str(path))
+    render_sheet = output_dir / "render_sheet.png"
+    write_image(render_sheet, "render sheet")
+    print(json.dumps({"render_sheet_path": str(render_sheet), "view_paths": view_paths, "metadata_path": None}))
+
+
+def _load_step(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def cmd_inspect(args: argparse.Namespace) -> None:
+    data = _load_step(Path(args.step_path))
+    requested = json.loads(args.measurements)
+    dims = data["dims"]
+    measurements = {}
+    for name in requested:
+        if name == "bounding_box":
+            measurements[name] = f"{dims.get('width', 0)}x{dims.get('height', 0)}x{dims.get('depth', dims.get('thickness', 0))}"
+        elif name == "hole_diameter":
+            measurements[name] = dims.get("hole_diameter", 0)
+        else:
+            measurements[name] = dims.get(name, "unknown")
+    print(json.dumps({"measurements": measurements}))
+
+
+def cmd_compare(args: argparse.Namespace) -> None:
+    candidate = _load_step(Path(args.candidate_step))
+    truth = _load_step(Path(args.truth_step))
+    cdims = candidate["dims"]
+    tdims = truth["dims"]
+    keys = sorted(set(cdims) | set(tdims))
+    deltas = {f"{key}_delta": abs(float(cdims.get(key, 0)) - float(tdims.get(key, 0))) for key in keys}
+    volume_c = float(cdims.get("width", 1)) * float(cdims.get("height", 1)) * float(cdims.get("depth", cdims.get("thickness", 1)))
+    volume_t = float(tdims.get("width", 1)) * float(tdims.get("height", 1)) * float(tdims.get("depth", tdims.get("thickness", 1)))
+    iou_proxy = min(volume_c, volume_t) / max(volume_c, volume_t)
+    metrics = {"iou_proxy": round(iou_proxy, 4), **deltas}
+    print(json.dumps({"metrics": metrics, "summary": "Fake cad compare completed"}))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    build = subparsers.add_parser("build")
+    build.add_argument("--model-source", required=True)
+    build.add_argument("--output-dir", required=True)
+    build.set_defaults(func=cmd_build)
+
+    render = subparsers.add_parser("render")
+    render.add_argument("--glb-path", required=True)
+    render.add_argument("--output-dir", required=True)
+    render.set_defaults(func=cmd_render)
+
+    inspect_cmd = subparsers.add_parser("inspect")
+    inspect_cmd.add_argument("--step-path", required=True)
+    inspect_cmd.add_argument("--measurements", required=True)
+    inspect_cmd.set_defaults(func=cmd_inspect)
+
+    compare = subparsers.add_parser("compare")
+    compare.add_argument("--candidate-step", required=True)
+    compare.add_argument("--truth-step", required=True)
+    compare.set_defaults(func=cmd_compare)
+
+    args = parser.parse_args()
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()
+

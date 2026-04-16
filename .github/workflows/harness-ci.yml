@@ -1,0 +1,51 @@
+name: Harness CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      FORMLOOP_LLM_BACKEND: heuristic
+      FORMLOOP_CAD_COMMAND: ${{ github.workspace }}/scripts/fake_cad
+      OPENAI_API_KEY: test-openai-key
+      ANTHROPIC_API_KEY: test-anthropic-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Run unit, integration, and smoke tests
+        run: source .venv/bin/activate && pytest
+        shell: bash
+
+  eval-main:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      FORMLOOP_LLM_BACKEND: heuristic
+      FORMLOOP_CAD_COMMAND: ${{ github.workspace }}/scripts/fake_cad
+      FORMLOOP_RUN_STORE: ${{ github.workspace }}/.formloop-ci
+      OPENAI_API_KEY: test-openai-key
+      ANTHROPIC_API_KEY: test-anthropic-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Run eval batch
+        run: source .venv/bin/activate && python -m formloop eval run basic_shapes --json
+        shell: bash
+      - name: Run UAT suite
+        run: source .venv/bin/activate && python -m formloop uat run --cad-command $FORMLOOP_CAD_COMMAND
+        shell: bash
