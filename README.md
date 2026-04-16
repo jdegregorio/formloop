@@ -108,6 +108,10 @@ Responsible for developer eval datasets, scoring, regression tracking, and CI in
 
 The harness should be multi-agent, but intentionally small and controlled in v1.
 
+It should use the OpenAI Agents SDK as the primary orchestration framework. OpenAI-backed runs should use the Responses path by default, and Anthropic-backed runs should be supported through the SDK's LiteLLM provider path.
+
+Configuration should stay profile-based and intentionally narrow. The initial checked-in profiles should be `normal`, `dev_test`, and `eval`, with a shared thinking control such as `low`, `medium`, and `high`.
+
 ### Manager agent
 
 The manager is responsible for:
@@ -121,12 +125,14 @@ The manager is responsible for:
 - producing concise intermediate updates
 
 The manager should not do heavy CAD authoring directly.
+The manager should attempt a first CAD iteration by default and only block for clarification when critical gaps make a credible first model impossible. When it proceeds under ambiguity, it should record explicit assumptions.
 
 ### Specialist agents
 
 #### CAD Designer
 
 Owns `build123d` modeling and model revisions. Produces authoritative geometry artifacts and responds to review feedback.
+It should behave like a mechanical design engineer, prioritizing standards-aware, manufacturable, spec-grounded modeling, and may involve the Design Researcher when external engineering facts would materially improve the design.
 
 #### Design Researcher
 
@@ -206,6 +212,8 @@ formloop eval report latest
 formloop doctor
 formloop update
 ```
+
+`formloop run`, `formloop eval run`, and `formloop doctor` should all be profile-aware so the operator can switch between `normal`, `dev_test`, and alternate provider-backed configurations intentionally.
 
 This CLI is for:
 

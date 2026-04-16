@@ -44,6 +44,10 @@ Formloop should use the manager-plus-specialists structure already agreed:
 * **Review Specialist**
 * **Eval Specialist**
 
+Formloop shall use the OpenAI Agents SDK as its primary agent orchestration framework. OpenAI-backed runs should use the Responses path by default, while Anthropic-backed runs should be supported through the SDK's LiteLLM provider path.
+
+The harness configuration surface should stay intentionally small and profile-based. At minimum it should provide checked-in `normal`, `dev_test`, and `eval` profiles with a shared thinking abstraction rather than exposing a broad matrix of provider-specific model controls.
+
 The key conceptual split inside Formloop is between two different review modes.
 
 **Internal design-loop review** is for normal user runs with no ground-truth geometry. It should evaluate the latest candidate against the normalized spec, rendered views, deterministic inspections, and optional user-provided reference images. It can be iterative and tool-using.
@@ -53,6 +57,10 @@ The rendered PNG views are passed to the review/judge LLMs as **multimodal image
 **Developer eval review** is for benchmarking runs where ground-truth geometry exists. It should combine deterministic calculators with agent judges, and may allow tool-using judges when needed for structured assessments like dimensional compliance. 
 
 That distinction belongs in Formloop, not in `cad-cli`, because it is fundamentally orchestration and evaluation policy rather than deterministic geometry tooling.
+
+The manager should attempt a first CAD iteration by default. It should only ask clarifying questions before first-pass generation when critical gaps make a credible initial model impossible, such as missing core function, blocking interfaces, or must-hit dimensions or tolerances. When proceeding under ambiguity, the manager should record explicit assumptions.
+
+The CAD Designer should operate like a mechanical design engineer: standards-aware, manufacturable, and grounded in the current spec. It may invoke the Design Researcher whenever named parts, mechanisms, standards, or conventions imply factual external knowledge that should guide the design.
 
 ### UI responsibilities
 
