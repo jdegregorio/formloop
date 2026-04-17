@@ -9,8 +9,8 @@ It is the main application layer sitting above deterministic CAD tooling. Where 
 Formloop should let a user:
 
 - describe a part or revision in chat
-- optionally provide reference images
-- receive intermediate progress updates
+- optionally provide one reference image per request
+- receive intermediate progress updates through polling-backed run snapshots and events
 - inspect the current fit, form, and function spec
 - view the latest rendered geometry
 - review lightweight quality findings from the internal loop
@@ -63,7 +63,7 @@ Geometry comparison is a core capability, not a side utility. The preferred path
 - user interface and chat surfaces
 - high-level operator CLI
 - skills, resources, and prompt context
-- current design state and revision state
+- run and revision state
 - eval orchestration and dataset management
 - run history, artifacts, and traceability plumbing
 
@@ -84,7 +84,7 @@ Responsible for:
 - context management
 - specialist routing
 - internal review loops
-- user-facing progress reporting
+- user-facing progress reporting through async polling
 
 ### B. Human interface
 
@@ -112,6 +112,10 @@ It should use the OpenAI Agents SDK as the primary orchestration framework. Open
 
 Configuration should stay profile-based and intentionally narrow. The initial checked-in profiles should be `normal`, `dev_test`, and `eval`, with a shared thinking control such as `low`, `medium`, and `high`.
 
+The core lifecycle is `run > revision`. A run is the single persistent design thread for one part, project, or eval case, and a revision is one persisted candidate iteration inside that run.
+
+Before implementation begins, Formloop should check in versioned JSON Schemas for its primary state, API, and report contracts. Typed models may derive from those schemas later, but the checked-in schemas are the canonical v1 contract source. This first pass should fully define only the core run, revision, artifact-manifest, review-summary, and run-snapshot contracts, while keeping the remaining schemas intentionally simple.
+
 ### Manager agent
 
 The manager is responsible for:
@@ -126,13 +130,18 @@ The manager is responsible for:
 
 The manager should not do heavy CAD authoring directly.
 The manager should attempt a first CAD iteration by default and only block for clarification when critical gaps make a credible first model impossible. When it proceeds under ambiguity, it should record explicit assumptions.
+In interactive mode, clarification answers should resume the blocked run in place. In non-interactive mode, critical-gap detection should move the run into `blocked_on_clarification` with a structured clarification event.
+
+A revision exists only after a candidate artifact bundle has been generated and persisted. Clarification, research, or spec cleanup alone do not create revisions. Revision ordinals remain monotonic within a run and do not reset after clarification or reopen.
+
+Runs are intentionally reopenable over time. A run may move from `blocked_on_clarification` or `completed` back to `active`, while preserving prior outcomes in status history for inspection.
 
 ### Specialist agents
 
 #### CAD Designer
 
 Owns `build123d` modeling and model revisions. Produces authoritative geometry artifacts and responds to review feedback.
-It should behave like a mechanical design engineer, prioritizing standards-aware, manufacturable, spec-grounded modeling, and may involve the Design Researcher when external engineering facts would materially improve the design.
+It should behave like a mechanical design engineer, prioritizing standards-aware, manufacturable, spec-grounded modeling, and should proactively involve the Design Researcher when external engineering facts would materially improve the design.
 
 #### Design Researcher
 
@@ -173,6 +182,9 @@ That is enough for:
 - render orchestration
 - artifact management
 
+When the runtime invokes `cad-cli`, it should capture and parse structured JSON from stdout rather than relying on ad hoc text parsing.
+The external programmatic interface should be HTTP-only in v1 and should use asynchronous job semantics with polling rather than transport streaming.
+
 ## Skill system
 
 Skills are reusable capability guides, not tiny macros.
@@ -186,6 +198,8 @@ Each skill should define:
 - conventions
 - common failures and recovery patterns
 - expected artifacts
+
+If a skill invokes `cad-cli`, it should also declare the target `cad-cli` release and the stdout JSON fields it depends on so `formloop doctor` can validate compatibility.
 
 Suggested v1 skills:
 
@@ -214,6 +228,7 @@ formloop update
 ```
 
 `formloop run`, `formloop eval run`, and `formloop doctor` should all be profile-aware so the operator can switch between `normal`, `dev_test`, and alternate provider-backed configurations intentionally.
+`formloop run` should support `--interactive` and `--no-interactive`, with the CLI defaulting to `--no-interactive`.
 
 This CLI is for:
 
@@ -231,6 +246,7 @@ The conceptual split remains:
 ## Artifact model
 
 The system should standardize artifacts early.
+The stable runtime filesystem shape should be `var/runs/<run-id>/revisions/`.
 
 ### Authoritative artifacts
 
@@ -258,6 +274,22 @@ The system should standardize artifacts early.
 - judge outputs
 - aggregated reports
 
+Each persisted revision bundle should contain at minimum:
+
+- STEP
+- GLB
+- per-view PNGs
+- render sheet PNG
+- revision metadata JSON
+- artifact manifest JSON
+
+After review completes, that same revision bundle should also contain:
+
+- review summary JSON
+- review notes or review output
+
+The runtime artifact tree should stay human-inspectable and live under `var/runs/`, while core source code remains in clearly named top-level directories such as `src/formloop/`, `ui/`, `schemas/`, `tests/`, `datasets/`, `skills/`, `docs/`, and `scripts/`.
+
 ## Human interface specification
 
 The UI should feel like a design review workspace, not a trace console.
@@ -274,7 +306,7 @@ A distilled, canonical summary of the current fit, form, and function target. Th
 
 #### Latest geometry
 
-The primary preview surface. Show the latest render sheet and allow access to individual views.
+The primary preview surface. Show the latest interactive GLB viewer and make the latest render sheet plus individual views available as secondary references.
 
 #### Latest review summary
 
@@ -352,6 +384,7 @@ Confirm that holes, chamfers, rounds, pockets, bosses, tabs, or other expected f
 #### Reference image review
 
 If the user provides a reference image, compare the rendered outputs against that image as part of closed-loop review. This is not exact geometric truth, but it is still useful for catching gross shape mismatch, missing features, wrong proportions, wrong silhouette, and wrong orientation.
+V1 should support one optional PNG or JPEG reference image per request.
 
 #### Render-based visual review
 
@@ -388,6 +421,7 @@ So the design loop can be iterative and tool-using, even though it does not have
 ## Deterministic CLI specification for cad-cli
 
 The external contract should be simple and unified.
+Formloop should treat `cad-cli` as a structured JSON-stdout contract and pin a supported release in checked-in config.
 
 ```bash
 cad build ...
@@ -507,16 +541,13 @@ Eval scoring should combine two classes of evaluators.
 
 These produce hard metrics from geometry and artifacts.
 
-Examples:
+Required v1 metric outputs:
 
 - shared volume
-- only-in-truth volume
+- only-in-ground-truth volume
 - only-in-candidate volume
-- IoU or overlap ratio
-- alignment residual
-- bounding-box delta
-- exact dimension deltas for named measurements
-- artifact presence and completeness
+- composite IoU ratio
+- artifact presence and completeness when relevant
 
 These should be the foundation of objective regression tracking.
 
@@ -524,14 +555,14 @@ These should be the foundation of objective regression tracking.
 
 These produce higher-level quality assessments that are difficult to express as a single deterministic formula.
 
-Examples:
+Required v1 qualitative dimensions:
 
-- adherence to user spec
-- presence of all critical features
-- plausibility of overall geometry
-- whether key requested details were omitted
-- whether the generated result appears materially acceptable despite small geometric deviation
-- reference image similarity assessment at a semantic level
+- `requirement_adherence` on a `0..4` scale
+- `feature_coverage` on a `0..4` scale
+- equal-weight average aggregate
+- confidence on a `0.0..1.0` scale
+
+Judge prompts should explicitly instruct the judge to ignore background color, lighting, edge rendering style, and geometry color, and to evaluate shape, geometry, and requested features only.
 
 These agent judges can be simple or tool-using.
 
@@ -575,18 +606,17 @@ Each batch eval should produce:
 
 ### Deterministic geometric accuracy
 
-- overlap metrics
-- only-in-truth
+- shared volume
+- only-in-ground-truth
 - only-in-candidate
-- alignment quality
-- measured dimension deltas
+- composite IoU ratio
 
 ### Structured quality judgment
 
-- spec adherence score
-- feature completeness score
-- dimensional compliance score
-- reference-image consistency score when applicable
+- requirement adherence score
+- feature coverage score
+- equal-weight aggregate score
+- confidence
 
 ### Artifact completeness
 
@@ -618,16 +648,18 @@ That gives both objective numeric regressions and higher-level quality assessmen
 
 A normal user run should look like this:
 
-1. user provides design request, optionally with a reference image
-2. manager writes or updates current spec
-3. manager invokes Design Researcher if needed
-4. manager invokes CAD Designer to create or revise geometry
-5. geometry is exported to STEP and GLB
-6. Render Specialist produces preview outputs
-7. Review Specialist evaluates the current candidate against the spec, inspection results, renders, and any reference image
-8. if needed, Review Specialist sends revision feedback back to CAD Designer
-9. loop continues until stop criteria are met
-10. UI updates current spec, latest geometry, review summary, and artifacts
+1. user provides a design request into a run, optionally with one reference image
+2. Formloop creates or resumes that run
+3. manager writes or updates current spec
+4. manager invokes Design Researcher if needed
+5. manager invokes CAD Designer to create or revise geometry
+6. geometry is exported to STEP and GLB
+7. Render Specialist produces preview outputs
+8. the current revision bundle is persisted
+9. Review Specialist evaluates the current candidate against the spec, inspection results, renders, and any reference image
+10. if needed, Review Specialist sends revision feedback back to CAD Designer
+11. loop continues until stop criteria are met or caps require a graceful landing
+12. UI updates current spec, latest geometry, review summary, run history, and artifacts
 
 ### Developer eval run
 
@@ -636,9 +668,9 @@ A developer eval run should look like this:
 1. load dataset case
 2. run generation from prompt/spec
 3. produce artifacts
-4. run deterministic compare and measurement calculators against ground truth
-5. run structured agent judges
-6. aggregate scores
+4. run deterministic compare calculators against ground truth, including shared volume, only-in-ground-truth volume, only-in-candidate volume, and IoU
+5. run structured agent judges for `requirement_adherence` and `feature_coverage`
+6. compute equal-weight aggregate scoring and confidence
 7. publish per-case and batch outputs
 
 ## Non-goals for the core version
@@ -693,7 +725,7 @@ A useful boundary:
 
 ## Initial development priorities
 
-1. define core run-state and artifact model
+1. define core run, revision, and artifact schemas
 2. establish app-to-`cad-cli` command contracts
 3. implement the first end-to-end part generation loop
 4. add revision and review loop support
