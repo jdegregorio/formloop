@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, TypeVar
 
-from agents import Agent, ModelSettings, RunConfig, Runner, set_tracing_disabled
+from agents import Agent, ModelSettings, OpenAIProvider, RunConfig, Runner, set_tracing_disabled
 from agents.extensions.models.litellm_provider import LitellmProvider
 from openai.types.shared import Reasoning
 from pydantic import BaseModel
@@ -53,6 +53,11 @@ def _thinking_to_reasoning(thinking: ThinkingLevel) -> Reasoning:
 class OpenAIAgentsBackend:
     backend_name: str = "openai_agents"
 
+    def _model_provider_for_profile(self, profile: RunProfile):
+        if profile.provider == ProviderKind.LITELLM:
+            return LitellmProvider()
+        return OpenAIProvider(use_responses=True)
+
     def structured_completion(
         self,
         *,
@@ -81,7 +86,7 @@ class OpenAIAgentsBackend:
             set_tracing_disabled(True)
         run_config = RunConfig(
             model=profile.model if profile.provider == ProviderKind.OPENAI_RESPONSES else None,
-            model_provider=LitellmProvider() if profile.provider == ProviderKind.LITELLM else None,
+            model_provider=self._model_provider_for_profile(profile),
             model_settings=model_settings,
             workflow_name=f"Formloop {role_name}",
             tracing_disabled=tracing_disabled,

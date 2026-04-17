@@ -46,7 +46,14 @@ def run(
         profile=profile,
         reference_image=ReferenceImage(path=str(reference_image), label="cli-reference") if reference_image else None,
     )
-    record = service.execute_run(request)
+    try:
+        record = service.execute_run(request)
+    except Exception as exc:
+        if json_output:
+            typer.echo(json.dumps({"ok": False, "error": str(exc)}, indent=2))
+        else:
+            typer.echo(f"Run failed: {exc}")
+        raise typer.Exit(1) from exc
     if json_output:
         typer.echo(record.model_dump_json(indent=2))
         return
@@ -193,4 +200,3 @@ def uat_run(
     service = create_service()
     report_path = run_uat(service, service.config.run_store_path / "uat")
     typer.echo(f"UAT report: {report_path}")
-

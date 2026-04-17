@@ -84,6 +84,20 @@ def test_cli_eval_and_report(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) ->
     assert "# Report" in report.stdout
 
 
+def test_cli_run_reports_failure_cleanly(monkeypatch: pytest.MonkeyPatch) -> None:
+    runner = CliRunner()
+
+    class FailingService(DummyService):
+        def execute_run(self, request):
+            raise RuntimeError("backend exploded")
+
+    monkeypatch.setattr("formloop.cli.create_service", lambda: FailingService())
+
+    result = runner.invoke(app, ["run", "Create a block"])
+    assert result.exit_code == 1
+    assert "Run failed: backend exploded" in result.stdout
+
+
 def test_cli_ui_lifecycle(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     runner = CliRunner()
     state_root = tmp_path / ".formloop"
@@ -117,4 +131,3 @@ def test_cli_ui_lifecycle(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     assert stopped.exit_code == 0
     assert "Stopped harness API server." in stopped.stdout
     assert killed
-

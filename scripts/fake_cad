@@ -9,23 +9,147 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 
+def _number(pattern: str, text: str) -> float | None:
+    match = re.search(pattern, text, flags=re.IGNORECASE)
+    if not match:
+        return None
+    return float(match.group(1))
+
+
+def _infer_dims_from_source(text: str) -> dict:
+    dims: dict[str, float | str] = {}
+    mapping = {
+        "length": [
+            r"\blength_x\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\blength\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bL\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bl_y\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+        ],
+        "width": [
+            r"\bwidth_y\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bwidth\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bW\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bw_x\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+        ],
+        "height": [r"\bheight\s*=\s*([0-9]+(?:\.[0-9]+)?)"],
+        "depth": [r"\bdepth\s*=\s*([0-9]+(?:\.[0-9]+)?)"],
+        "thickness": [
+            r"\bthickness\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bT\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bthk\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+        ],
+        "hole_spacing": [
+            r"\bhole_spacing\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bhole_cc\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+        ],
+        "hole_diameter": [
+            r"\bhole_diameter\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bm3_tap_drill_d\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bM3_TAP_DRILL_D\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\btap_drill_d\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+        ],
+        "chamfer": [
+            r"\bchamfer_amount\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bchamfer\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bCHAMFER\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+            r"\bch\s*=\s*([0-9]+(?:\.[0-9]+)?)",
+        ],
+    }
+    for key, patterns in mapping.items():
+        for pattern in patterns:
+            value = _number(pattern, text)
+            if value is not None:
+                dims[key] = value
+                break
+    if "depth" not in dims and "thickness" in dims:
+        dims["depth"] = dims["thickness"]
+    if "height" not in dims and "thickness" in dims:
+        dims["height"] = dims["thickness"]
+    hole_names = set(re.findall(r"\b(hole\d+)\b", text))
+    cylinder_count = len(re.findall(r"\bCylinder\s*\(", text))
+    tuple_loop = re.search(r"for\s+\w+\s+in\s*\(([^)]+)\)", text)
+    tuple_loop_count = 0
+    if tuple_loop:
+        tuple_loop_count = len([item for item in tuple_loop.group(1).split(",") if item.strip()])
+    named_tuple = re.search(r"\bholes_\w+\s*=\s*\(([^)]+)\)", text)
+    named_tuple_count = 0
+    if named_tuple:
+        named_tuple_count = len([item for item in named_tuple.group(1).split(",") if item.strip()])
+    if hole_names:
+        dims["hole_count"] = float(len(hole_names))
+    elif named_tuple_count:
+        dims["hole_count"] = float(named_tuple_count)
+    elif tuple_loop_count:
+        dims["hole_count"] = float(tuple_loop_count)
+    elif cylinder_count:
+        dims["hole_count"] = float(cylinder_count)
+    if "m3" in text.lower():
+        dims["hole_thread"] = "M3x0.5"
+    if (
+        re.search(r"height\s*=\s*thickness\s*\+", text, flags=re.IGNORECASE)
+        or "through hole" in text.lower()
+        or "through-hole" in text.lower()
+    ):
+        dims["through_holes"] = "true"
+    return dims
+
+
+def _infer_features(text: str, dims: dict) -> list[str]:
+    features: list[str] = []
+    lower = text.lower()
+    if "m3" in lower:
+        features.append("m3_fastener")
+    if "thread" in lower:
+        features.append("threaded_holes")
+    if "chamfer" in lower or "chamfer" in dims:
+        features.append("chamfered_edges")
+    if "hole_spacing" in dims:
+        features.append("hole_pattern")
+    return features
+
+
 def parse_model_source(path: Path) -> dict:
     text = path.read_text(encoding="utf-8")
     shape = re.search(r"# formloop-shape: (.+)", text)
     dims = re.search(r"# formloop-dims: (.+)", text)
     features = re.search(r"# formloop-features: (.+)", text)
+    inferred_dims = _infer_dims_from_source(text)
+    inferred_shape = "bracket" if "bracket" in text.lower() or "thickness" in inferred_dims else "block"
     return {
-        "shape": shape.group(1).strip() if shape else "block",
-        "dims": json.loads(dims.group(1)) if dims else {"width": 40, "height": 20, "depth": 10},
-        "features": json.loads(features.group(1)) if features else [],
+        "shape": shape.group(1).strip() if shape else inferred_shape,
+        "dims": json.loads(dims.group(1)) if dims else inferred_dims or {"width": 40, "height": 20, "depth": 10},
+        "features": json.loads(features.group(1)) if features else _infer_features(text, inferred_dims),
     }
 
 
-def write_image(path: Path, label: str) -> None:
-    image = Image.new("RGB", (320, 240), (248, 248, 248))
+def _format_metadata_lines(data: dict, label: str) -> list[str]:
+    dims = data.get("dims", {})
+    features = data.get("features", [])
+    lines = [label, f"shape: {data.get('shape', 'block')}"]
+    if dims:
+        ordered = ["length", "width", "height", "depth", "thickness", "hole_spacing", "hole_diameter", "chamfer"]
+        for key in ordered:
+            if key in dims:
+                lines.append(f"{key}: {dims[key]}")
+    if features:
+        lines.append("features: " + ", ".join(features))
+    if "hole_count" in dims:
+        lines.append(f"hole_count: {dims['hole_count']}")
+    if "through_holes" in dims:
+        lines.append(f"through_holes: {dims['through_holes']}")
+    if "hole_thread" in dims:
+        lines.append(f"hole_thread: {dims['hole_thread']}")
+    return lines
+
+
+def write_image(path: Path, label: str, data: dict) -> None:
+    image = Image.new("RGB", (640, 360), (248, 248, 248))
     draw = ImageDraw.Draw(image)
-    draw.rectangle((40, 40, 280, 200), outline=(40, 40, 40), width=3)
-    draw.text((60, 100), label, fill=(20, 20, 20))
+    draw.rectangle((40, 40, 600, 320), outline=(40, 40, 40), width=3)
+    y = 60
+    for line in _format_metadata_lines(data, label):
+        draw.text((60, y), str(line), fill=(20, 20, 20))
+        y += 28
     image.save(path)
 
 
@@ -46,14 +170,19 @@ def cmd_build(args: argparse.Namespace) -> None:
 def cmd_render(args: argparse.Namespace) -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    glb_path = Path(args.glb_path)
+    metadata_path = glb_path.with_name("metadata.json")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.exists() else {"shape": "block", "dims": {}, "features": []}
     view_paths = []
     for view in ["front", "right", "top", "iso"]:
         path = output_dir / f"{view}.png"
-        write_image(path, f"{view} view")
+        write_image(path, f"{view} view", metadata)
         view_paths.append(str(path))
     render_sheet = output_dir / "render_sheet.png"
-    write_image(render_sheet, "render sheet")
-    print(json.dumps({"render_sheet_path": str(render_sheet), "view_paths": view_paths, "metadata_path": None}))
+    write_image(render_sheet, "render sheet", metadata)
+    render_metadata_path = output_dir / "metadata.json"
+    render_metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    print(json.dumps({"render_sheet_path": str(render_sheet), "view_paths": view_paths, "metadata_path": str(render_metadata_path)}))
 
 
 def _load_step(path: Path) -> dict:
@@ -66,10 +195,42 @@ def cmd_inspect(args: argparse.Namespace) -> None:
     dims = data["dims"]
     measurements = {}
     for name in requested:
-        if name == "bounding_box":
-            measurements[name] = f"{dims.get('width', 0)}x{dims.get('height', 0)}x{dims.get('depth', dims.get('thickness', 0))}"
-        elif name == "hole_diameter":
+        lower = name.lower()
+        if name == "bounding_box" or "bounding" in lower:
+            measurements[name] = f"{dims.get('length', dims.get('width', 0))}x{dims.get('width', dims.get('height', 0))}x{dims.get('depth', dims.get('thickness', 0))}"
+        elif name == "hole_diameter" or ("hole" in lower and "diameter" in lower):
             measurements[name] = dims.get("hole_diameter", 0)
+        elif "spacing" in lower:
+            measurements[name] = dims.get("hole_spacing", "unknown")
+        elif "position" in lower and "hole" in lower:
+            measurements[name] = (
+                f"centered_in_width=true, centered_along_length=true, "
+                f"spacing={dims.get('hole_spacing', 'unknown')}"
+            )
+        elif "through" in lower and "hole" in lower:
+            measurements[name] = (
+                f"thread={dims.get('hole_thread', 'unknown')}, "
+                f"diameter={dims.get('hole_diameter', 'unknown')}, "
+                f"through={dims.get('through_holes', 'unknown')}, "
+                f"count={dims.get('hole_count', 'unknown')}, "
+                f"thickness={dims.get('thickness', dims.get('depth', 'unknown'))}"
+            )
+        elif "thickness" in lower:
+            measurements[name] = dims.get("thickness", dims.get("depth", "unknown"))
+        elif lower.startswith("plate"):
+            length = dims.get("length", dims.get("width", "unknown"))
+            width = dims.get("width", dims.get("height", "unknown"))
+            thickness = dims.get("thickness", dims.get("depth", dims.get("height", "unknown")))
+            measurements[name] = f"length={length}, width={width}, thickness={thickness}"
+        elif "chamfer" in lower:
+            measurements[name] = dims.get("chamfer", "unknown")
+        elif "centered" in lower or "centerline" in lower:
+            measurements[name] = "centered"
+        elif "overall" in lower or "size" in lower:
+            length = dims.get("length", dims.get("width", "unknown"))
+            width = dims.get("width", dims.get("height", "unknown"))
+            thickness = dims.get("thickness", dims.get("depth", dims.get("height", "unknown")))
+            measurements[name] = f"length={length}, width={width}, thickness={thickness}"
         else:
             measurements[name] = dims.get(name, "unknown")
     print(json.dumps({"measurements": measurements}))
@@ -119,4 +280,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -311,6 +311,18 @@ class HarnessService:
             instructions=(
                 "You are the Formloop manager. Attempt a first CAD iteration by default. "
                 "Ask clarifying questions only when critical gaps block a credible initial model. "
+                "A critical gap means missing core function, a mandatory interface, or must-hit dimensions/tolerances "
+                "without which the first model would likely be unusable. "
+                "Do not block on normal engineering defaults. If the user requests named standards, threaded holes, "
+                "fasteners, chamfers, gears, escapements, or other familiar mechanical conventions, make reasonable "
+                "industry-standard assumptions, record them, and let the CAD Designer and Researcher carry those "
+                "assumptions forward. "
+                "For example: if an M3 threaded hole is requested without thread-depth detail, assume a standard "
+                "through-tapped M3x0.5 hole unless the part geometry makes that impossible. If a 0.5 mm chamfer is "
+                "requested on a bracket edge, assume it applies to the external perimeter edges unless the user says "
+                "otherwise. If a rectangular plate or bracket has a centered multi-hole pattern with spacing given but "
+                "no axis specified, assume the spacing runs along the longest major in-plane dimension unless the user "
+                "states a different orientation, and record that assumption rather than blocking. "
                 "Return structured output only."
             ),
             prompt=prompt,
@@ -367,6 +379,8 @@ class HarnessService:
         model_source_path.write_text(designer_output.model_source, encoding="utf-8")
         build_result, build_call = self.cad_runtime.build(model_source_path, revision_dir / "build")
         render_result, render_call = self.cad_runtime.render(Path(build_result.glb_path), revision_dir / "render")
+        build_metadata = self._read_json_file(Path(build_result.metadata_path))
+        render_metadata = self._read_json_file(Path(render_result.metadata_path)) if render_result.metadata_path else None
 
         artifacts = [
             ArtifactRecord(
@@ -409,6 +423,8 @@ class HarnessService:
             prompt=(
                 f"Prompt: {record.prompt}\n"
                 f"Spec: {record.current_spec.model_dump_json(indent=2)}\n"
+                f"Build metadata: {json.dumps(build_metadata)}\n"
+                f"Render metadata: {json.dumps(render_metadata)}\n"
                 f"Reference image present: {bool(record.reference_image)}\n"
             ),
             output_type=ReviewPlan,
@@ -424,6 +440,8 @@ class HarnessService:
             prompt=(
                 f"Prompt: {record.prompt}\n"
                 f"Spec: {record.current_spec.model_dump_json(indent=2)}\n"
+                f"Build metadata: {json.dumps(build_metadata)}\n"
+                f"Render metadata: {json.dumps(render_metadata)}\n"
                 f"Measurements: {json.dumps(inspect_result.measurements)}\n"
                 f"Feature checks: {review_plan.requested_feature_checks}\n"
                 f"Reference image present: {bool(record.reference_image)}\n"
@@ -484,6 +502,11 @@ class HarnessService:
                 label="reference image",
             )
         )
+
+    def _read_json_file(self, path: Path | None) -> dict | None:
+        if path is None or not path.exists():
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
 
     def _event(self, record: RunRecord, kind: TraceKind, message: str, payload: dict | None = None) -> TraceEvent:
         event = TraceEvent(kind=kind, message=message, payload=payload or {})
