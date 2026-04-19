@@ -1,0 +1,95 @@
+{
+  "$defs": {
+    "RevisionTrigger": {
+      "enum": [
+        "initial",
+        "review_revise",
+        "manual"
+      ],
+      "title": "RevisionTrigger",
+      "type": "string"
+    }
+  },
+  "$id": "formloop/revision",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One persisted candidate iteration inside a run (FLH-F-022).",
+  "properties": {
+    "artifact_manifest_path": {
+      "title": "Artifact Manifest Path",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "designer_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Designer Notes"
+    },
+    "known_risks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Known Risks",
+      "type": "array"
+    },
+    "ordinal": {
+      "minimum": 1,
+      "title": "Ordinal",
+      "type": "integer"
+    },
+    "review_summary_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review Summary Path"
+    },
+    "revision_id": {
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "revision_name": {
+      "description": "Human-readable sequential like rev-001.",
+      "title": "Revision Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "spec_snapshot": {
+      "additionalProperties": true,
+      "title": "Spec Snapshot",
+      "type": "object"
+    },
+    "trigger": {
+      "$ref": "#/$defs/RevisionTrigger"
+    }
+  },
+  "required": [
+    "revision_id",
+    "revision_name",
+    "ordinal",
+    "trigger",
+    "artifact_manifest_path"
+  ],
+  "title": "Revision",
+  "type": "object"
+}

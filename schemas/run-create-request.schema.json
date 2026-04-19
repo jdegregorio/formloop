@@ -1,0 +1,57 @@
+{
+  "$id": "formloop/run-create-request",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Minimum payload to start a run.",
+  "properties": {
+    "max_revisions": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Override the config default.",
+      "title": "Max Revisions"
+    },
+    "profile": {
+      "default": "normal",
+      "description": "One of the named profiles.",
+      "title": "Profile",
+      "type": "string"
+    },
+    "prompt": {
+      "minLength": 1,
+      "title": "Prompt",
+      "type": "string"
+    },
+    "reference_image": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional path (server-side) to a reference image.",
+      "title": "Reference Image"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "prompt"
+  ],
+  "title": "RunCreateRequest",
+  "type": "object"
+}

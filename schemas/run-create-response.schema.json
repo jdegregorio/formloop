@@ -1,0 +1,38 @@
+{
+  "$id": "formloop/run-create-response",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Minimum payload returned when a run is created.",
+  "properties": {
+    "events_url": {
+      "title": "Events Url",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "run_name": {
+      "title": "Run Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "status_url": {
+      "title": "Status Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "run_name",
+    "status_url",
+    "events_url"
+  ],
+  "title": "RunCreateResponse",
+  "type": "object"
+}

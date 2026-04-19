@@ -1,0 +1,38 @@
+# Formloop harness runtime defaults (FLH-D-014).
+# Non-secret configuration checked into the repo.
+# Secrets live in .env.local (FLH-D-015); OPENAI_API_KEY is required (FLH-D-016).
+
+default_profile = "normal"
+
+# Revision loop discipline (FLH-NF-009).
+max_revisions = 3
+
+# Path (relative to repo root) where generated run artifacts live (FLH-D-023).
+runs_dir = "var/runs"
+evals_dir = "var/evals"
+
+# Subprocess / external tool timeouts, seconds.
+[timeouts]
+cad_build = 180
+cad_render = 240
+cad_inspect = 60
+cad_compare = 240
+agent_run = 600
+
+# Profiles (FLH-D-017). Each maps to an OpenAI model + reasoning level.
+[profiles.normal]
+model = "gpt-5.4"
+reasoning = "high"
+description = "Normal user-facing execution and eval execution."
+
+[profiles.dev_test]
+model = "gpt-5.4-nano"
+reasoning = "low"
+description = "Low-cost plumbing and smoke validation."
+
+# HTTP API defaults (FLH-D-019).
+[api]
+host = "127.0.0.1"
+port = 8765
+pid_file = "var/formloop.pid"
+log_file = "var/formloop.log"

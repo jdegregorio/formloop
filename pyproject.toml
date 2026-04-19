@@ -1,0 +1,62 @@
+[project]
+name = "formloop"
+version = "0.1.0"
+description = "Formloop agent harness for natural-language-driven CAD generation."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "John DeGregorio" }
+]
+dependencies = [
+  "openai-agents>=0.3.0",
+  "pydantic>=2.8.0,<3.0.0",
+  "fastapi>=0.115.0,<0.200.0",
+  "uvicorn>=0.32.0,<0.40.0",
+  "typer>=0.12.0,<1.0.0",
+  "python-dotenv>=1.0.0,<2.0.0",
+  "httpx>=0.27.0,<1.0.0",
+  "cad-cli",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.0,<9.0.0",
+  "pytest-asyncio>=0.24.0,<1.0.0",
+  "ruff>=0.11.0,<0.12.0",
+  "mypy>=1.16.0,<2.0.0",
+]
+
+[project.scripts]
+formloop = "formloop.cli:app"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/formloop"]
+
+[tool.uv.sources]
+cad-cli = { path = "../cad-cli", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+  "uat: real end-to-end UAT that hits the OpenAI API (cost-incurring)",
+  "smoke: cheap end-to-end flow on dev_test profile",
+  "integration: cross-boundary tests involving cad-cli or filesystem",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+packages = ["formloop"]
