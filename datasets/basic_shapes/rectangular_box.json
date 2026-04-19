@@ -1,0 +1,36 @@
+{
+  "case_id": "rectangular_box_10_20_30",
+  "prompt": "Create a rectangular box that is 10 mm wide, 20 mm deep, and 30 mm tall.",
+  "normalized_spec": {
+    "intent_summary": "A 10 x 20 x 30 mm rectangular box.",
+    "fit_requirements": [],
+    "form_requirements": [
+      "Rectangular prism"
+    ],
+    "function_requirements": [
+      "Demonstration solid"
+    ],
+    "dimensions_constraints": [
+      "10 mm width",
+      "20 mm depth",
+      "30 mm height"
+    ],
+    "required_features": [
+      "Single solid rectangular prism"
+    ],
+    "optional_reference_image": null,
+    "open_questions": [],
+    "assumptions": [
+      "Centered at the origin is acceptable."
+    ]
+  },
+  "ground_truth_step": "rectangular_box.step",
+  "reference_image": null,
+  "tolerances": {
+    "min_overlap_ratio": 0.999
+  },
+  "tags": [
+    "basic",
+    "box"
+  ]
+}

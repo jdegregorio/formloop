@@ -1,0 +1,34 @@
+{
+  "case_id": "cube_20mm",
+  "prompt": "Create a 20 mm cube.",
+  "normalized_spec": {
+    "intent_summary": "A simple 20 mm cube.",
+    "fit_requirements": [],
+    "form_requirements": [
+      "Cube"
+    ],
+    "function_requirements": [
+      "Demonstration solid"
+    ],
+    "dimensions_constraints": [
+      "20 mm x 20 mm x 20 mm overall size"
+    ],
+    "required_features": [
+      "Single solid cube"
+    ],
+    "optional_reference_image": null,
+    "open_questions": [],
+    "assumptions": [
+      "Centered at the origin is acceptable."
+    ]
+  },
+  "ground_truth_step": "cube.step",
+  "reference_image": null,
+  "tolerances": {
+    "min_overlap_ratio": 0.999
+  },
+  "tags": [
+    "basic",
+    "cube"
+  ]
+}

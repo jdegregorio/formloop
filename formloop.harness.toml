@@ -1,0 +1,20 @@
+# Req: FLH-D-014, FLH-D-017, FLH-D-018
+[runtime]
+default_profile = "normal"
+run_root = "var/runs"
+max_revision_attempts = 3
+build_repair_attempts = 2
+http_host = "127.0.0.1"
+http_port = 8123
+
+[profiles.normal]
+model = "gpt-5.4"
+reasoning = "high"
+model_path = "responses"
+max_revisions = 3
+
+[profiles.dev_test]
+model = "gpt-5.4-nano"
+reasoning = "low"
+model_path = "responses"
+max_revisions = 2

@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "ArtifactSummaryItem": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "path"
+      ],
+      "title": "ArtifactSummaryItem",
+      "type": "object"
+    },
+    "RunStatus": {
+      "enum": [
+        "created",
+        "running",
+        "awaiting_review",
+        "completed",
+        "failed"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_summary": {
+      "items": {
+        "$ref": "#/$defs/ArtifactSummaryItem"
+      },
+      "title": "Artifact Summary",
+      "type": "array"
+    },
+    "current_spec_summary": {
+      "title": "Current Spec Summary",
+      "type": "string"
+    },
+    "last_event_reference": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Event Reference"
+    },
+    "latest_review_summary_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latest Review Summary Path"
+    },
+    "latest_revision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latest Revision Id"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "run_name": {
+      "title": "Run Name",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus"
+    }
+  },
+  "required": [
+    "run_id",
+    "run_name",
+    "status",
+    "current_spec_summary"
+  ],
+  "title": "RunSnapshot",
+  "type": "object"
+}

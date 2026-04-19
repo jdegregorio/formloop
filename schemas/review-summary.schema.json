@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "ReviewDecision": {
+      "enum": [
+        "accept",
+        "revise"
+      ],
+      "title": "ReviewDecision",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "decision": {
+      "$ref": "#/$defs/ReviewDecision"
+    },
+    "key_findings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Key Findings",
+      "type": "array"
+    },
+    "revision_instructions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Revision Instructions",
+      "type": "array"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "suspect_dimensions_to_recheck": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Suspect Dimensions To Recheck",
+      "type": "array"
+    },
+    "suspect_or_missing_features": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Suspect Or Missing Features",
+      "type": "array"
+    }
+  },
+  "required": [
+    "decision",
+    "confidence",
+    "summary"
+  ],
+  "title": "ReviewSummary",
+  "type": "object"
+}

@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "breadcrumb": {
+      "title": "Breadcrumb",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "data": {
+      "additionalProperties": true,
+      "title": "Data",
+      "type": "object"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_type": {
+      "title": "Event Type",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "status",
+    "breadcrumb"
+  ],
+  "title": "ProgressEvent",
+  "type": "object"
+}

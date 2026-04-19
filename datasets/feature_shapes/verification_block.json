@@ -1,0 +1,45 @@
+{
+  "case_id": "verification_block_default",
+  "prompt": "Create a 20 mm square verification block that is 60 mm tall. Add a 5 mm diameter transverse through hole through the middle of the block. Add a 5 mm diameter blind hole from the top face with a 10 mm diameter counterbore on top. Use a 10 mm blind-hole depth and a 5 mm counterbore depth.",
+  "normalized_spec": {
+    "intent_summary": "A verification block with a transverse through hole and a counterbored blind hole.",
+    "fit_requirements": [],
+    "form_requirements": [
+      "Tall rectangular block"
+    ],
+    "function_requirements": [
+      "Through hole",
+      "Counterbored blind top hole"
+    ],
+    "dimensions_constraints": [
+      "20 mm width",
+      "20 mm depth",
+      "60 mm height",
+      "5 mm through-hole diameter",
+      "5 mm blind-hole diameter",
+      "10 mm counterbore diameter",
+      "10 mm blind-hole depth",
+      "5 mm counterbore depth"
+    ],
+    "required_features": [
+      "Transverse through hole",
+      "Top blind hole",
+      "Counterbore on the top blind hole"
+    ],
+    "optional_reference_image": null,
+    "open_questions": [],
+    "assumptions": [
+      "Use the default verification-block proportions from the deterministic reference."
+    ]
+  },
+  "ground_truth_step": "verification_block.step",
+  "reference_image": null,
+  "tolerances": {
+    "min_overlap_ratio": 0.96
+  },
+  "tags": [
+    "feature",
+    "verification",
+    "block"
+  ]
+}

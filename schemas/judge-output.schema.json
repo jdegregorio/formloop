@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "EvalPassStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "warning"
+      ],
+      "title": "EvalPassStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "issues": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "mode": {
+      "title": "Mode",
+      "type": "string"
+    },
+    "pass_status": {
+      "$ref": "#/$defs/EvalPassStatus"
+    },
+    "rationale": {
+      "title": "Rationale",
+      "type": "string"
+    },
+    "recommended_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Recommended Actions",
+      "type": "array"
+    },
+    "score": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Score",
+      "type": "number"
+    }
+  },
+  "required": [
+    "mode",
+    "score",
+    "pass_status",
+    "rationale"
+  ],
+  "title": "JudgeOutput",
+  "type": "object"
+}

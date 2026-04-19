@@ -1,0 +1,59 @@
+[project]
+name = "formloop"
+version = "0.1.0"
+description = "Agent harness for deterministic CAD workflows built on cad-cli."
+readme = "SPEC.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "John DeGregorio" }
+]
+dependencies = [
+  "fastapi>=0.116.0,<1.0.0",
+  "filelock>=3.18.0,<4.0.0",
+  "httpx>=0.28.0,<1.0.0",
+  "jsonschema>=4.25.0,<5.0.0",
+  "openai>=2.25.0,<3.0.0",
+  "openai-agents>=0.3.0,<1.0.0",
+  "pydantic>=2.11.0,<3.0.0",
+  "python-dotenv>=1.1.0,<2.0.0",
+  "typer>=0.16.0,<1.0.0",
+  "typing-extensions>=4.14.0,<5.0.0",
+  "uvicorn>=0.35.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.17.0,<2.0.0",
+  "pytest>=8.4.0,<9.0.0",
+  "pytest-asyncio>=1.1.0,<2.0.0",
+  "pytest-xdist>=3.8.0,<4.0.0",
+  "ruff>=0.12.0,<0.13.0",
+]
+
+[project.scripts]
+formloop = "formloop.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/formloop"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+strict = true
+packages = ["formloop"]

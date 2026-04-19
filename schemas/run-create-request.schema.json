@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Profile"
+    },
+    "prompt": {
+      "title": "Prompt",
+      "type": "string"
+    },
+    "reference_image": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Image"
+    }
+  },
+  "required": [
+    "prompt"
+  ],
+  "title": "RunCreateRequest",
+  "type": "object"
+}

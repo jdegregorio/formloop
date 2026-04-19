@@ -1,0 +1,40 @@
+{
+  "case_id": "hole_plate_default",
+  "prompt": "Create a 40 mm by 24 mm by 8 mm plate with two 6 mm through holes centered 20 mm apart.",
+  "normalized_spec": {
+    "intent_summary": "A rectangular plate with two through holes.",
+    "fit_requirements": [],
+    "form_requirements": [
+      "Rectangular plate"
+    ],
+    "function_requirements": [
+      "Plate with two through holes"
+    ],
+    "dimensions_constraints": [
+      "40 mm width",
+      "24 mm depth",
+      "8 mm thickness",
+      "6 mm hole diameter",
+      "20 mm hole center spacing"
+    ],
+    "required_features": [
+      "Two circular through holes",
+      "Rectangular outer profile"
+    ],
+    "optional_reference_image": null,
+    "open_questions": [],
+    "assumptions": [
+      "The holes are centered on the Y axis."
+    ]
+  },
+  "ground_truth_step": "hole_plate.step",
+  "reference_image": null,
+  "tolerances": {
+    "min_overlap_ratio": 0.98
+  },
+  "tags": [
+    "feature",
+    "holes",
+    "plate"
+  ]
+}

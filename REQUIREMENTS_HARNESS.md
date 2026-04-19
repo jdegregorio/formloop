@@ -8,87 +8,87 @@
 
 | ID | Requirement | Rationale | Status |
 | -- | ----------- | --------- | ------ |
-| FLH-F-001 | The harness shall maintain a normalized current fit/form/function specification for the active design. | The normalized spec is the shared object that connects user intent, agent work, review, and delivery. | Proposed |
-| FLH-F-002 | The harness shall provide a manager agent that coordinates the active run and owns the final user-facing answer. | The architecture is manager-led rather than peer-to-peer. | Proposed |
-| FLH-F-003 | The harness shall provide at minimum the specialist roles CAD Designer, Design Researcher, and Quality Specialist. | v1 should keep the specialist set intentionally small. | Proposed |
-| FLH-F-004 | The manager shall invoke specialists as bounded tool-like capabilities using the OpenAI Agents SDK `agent.as_tool()` pattern or an equivalent SDK mechanism. | The chosen architecture is hub-and-spoke with the manager retaining control. | Proposed |
-| FLH-F-005 | The harness shall support an internal review loop for normal design runs where no ground-truth geometry is available. | Normal user runs still require closed-loop validation. | Proposed |
-| FLH-F-006 | The Quality Specialist shall support a normal design-review mode and a developer-eval mode. | One specialist role should cover both review contexts without duplicating architecture. | Proposed |
-| FLH-F-007 | The normal design-review mode shall assess the latest candidate against the normalized spec, rendered outputs, deterministic inspections, and at most one optional user-provided reference image. | These are the minimum inputs needed to close the loop without ground-truth geometry. | Proposed |
-| FLH-F-008 | The Quality Specialist shall be able to request further revision from the CAD Designer when the current candidate is not acceptable. | The review loop must be able to drive iteration. | Proposed |
-| FLH-F-009 | The harness shall generate and retain a standard revision artifact bundle including STEP, GLB, rendered views, and a render sheet for each persisted candidate. | Durable artifacts are required for review, UI presentation, and traceability. | Proposed |
-| FLH-F-010 | The harness shall produce a concise structured review summary suitable for downstream consumption by the UI, CLI, and stored revision records. | Review output should be machine-usable rather than only narrative prose. | Proposed |
-| FLH-F-011 | The harness shall record and expose run history, revision history, artifact references, and structured execution traces for each run. | Traceability is a product feature. | Proposed |
-| FLH-F-012 | The harness shall expose a high-level operator CLI for application lifecycle, single-run execution, eval execution, diagnostics, and updates. | Formloop owns an operator CLI separate from `cad-cli`. | Proposed |
-| FLH-F-013 | The operator CLI shall support `formloop ui start`, `formloop ui stop`, `formloop ui status`, `formloop run`, `formloop eval run`, `formloop eval report`, `formloop doctor`, and `formloop update`. | These are the agreed primary operator surfaces. | Proposed |
-| FLH-F-014 | The harness shall support developer eval runs over datasets with known ground-truth geometry. | Developer evals are a first-class system capability. | Proposed |
-| FLH-F-015 | The harness shall combine deterministic eval metrics with structured LLM judge outputs. | Both deterministic evidence and higher-level assessment are required. | Proposed |
-| FLH-F-016 | The Design Researcher shall be able to perform internet research through OpenAI search-enabled requests. | Standards, conventions, and part facts may require external research. | Proposed |
-| FLH-F-017 | The manager shall be able to identify required research topics without being required to execute each research task directly. | The harness may orchestrate research fan-out on the manager's behalf. | Proposed |
-| FLH-F-018 | The harness shall support application-orchestrated concurrent research execution for independent research branches. | Independent research work should be parallelizable without surrendering control to planner-style tool use. | Proposed |
-| FLH-F-019 | The harness shall always attempt to produce at least one delivered revision through the run-and-review loop. | The product should bias toward a real design attempt rather than a question-first dead end. | Proposed |
-| FLH-F-020 | When design intent is incomplete but the likely direction is still inferable, the manager shall record explicit assumptions in structured state and proceed. | v1 should tolerate ambiguity without stalling unnecessarily. | Proposed |
-| FLH-F-021 | The harness shall use `run > revision` as its top-level persistence model. | This is the agreed lifecycle abstraction. | Proposed |
-| FLH-F-022 | A revision shall exist only after a candidate artifact bundle has been generated and persisted within a run. | Revisions should represent inspectable candidate outputs, not every internal step. | Proposed |
-| FLH-F-023 | The harness shall use human-readable sequential naming for persisted runs and revisions, while allowing hashes or opaque identifiers as secondary unique IDs where needed. | Stored results should be easy to inspect and naturally sort. | Proposed |
-| FLH-F-024 | The harness shall emit LLM-generated progress updates at meaningful milestones and expose them as pollable structured events. | The user explicitly wants breadcrumb-style explanations of what the harness is doing and why. | Proposed |
-| FLH-F-025 | The harness shall expose a stable HTTP programmatic interface through which clients can create runs, poll current run snapshots and events, and retrieve run artifacts and review outputs. | The UI is a separate build and needs a clean contract boundary. | Proposed |
+| FLH-F-001 | The harness shall maintain a normalized current fit/form/function specification for the active design. | The normalized spec is the shared object that connects user intent, agent work, review, and delivery. | Validated |
+| FLH-F-002 | The harness shall provide a manager agent that coordinates the active run and owns the final user-facing answer. | The architecture is manager-led rather than peer-to-peer. | Validated |
+| FLH-F-003 | The harness shall provide at minimum the specialist roles CAD Designer, Design Researcher, and Quality Specialist. | v1 should keep the specialist set intentionally small. | Validated |
+| FLH-F-004 | The manager shall invoke specialists as bounded tool-like capabilities using the OpenAI Agents SDK `agent.as_tool()` pattern or an equivalent SDK mechanism. | The chosen architecture is hub-and-spoke with the manager retaining control. | Validated |
+| FLH-F-005 | The harness shall support an internal review loop for normal design runs where no ground-truth geometry is available. | Normal user runs still require closed-loop validation. | Validated |
+| FLH-F-006 | The Quality Specialist shall support a normal design-review mode and a developer-eval mode. | One specialist role should cover both review contexts without duplicating architecture. | Validated |
+| FLH-F-007 | The normal design-review mode shall assess the latest candidate against the normalized spec, rendered outputs, deterministic inspections, and at most one optional user-provided reference image. | These are the minimum inputs needed to close the loop without ground-truth geometry. | Validated |
+| FLH-F-008 | The Quality Specialist shall be able to request further revision from the CAD Designer when the current candidate is not acceptable. | The review loop must be able to drive iteration. | Validated |
+| FLH-F-009 | The harness shall generate and retain a standard revision artifact bundle including STEP, GLB, rendered views, and a render sheet for each persisted candidate. | Durable artifacts are required for review, UI presentation, and traceability. | Validated |
+| FLH-F-010 | The harness shall produce a concise structured review summary suitable for downstream consumption by the UI, CLI, and stored revision records. | Review output should be machine-usable rather than only narrative prose. | Validated |
+| FLH-F-011 | The harness shall record and expose run history, revision history, artifact references, and structured execution traces for each run. | Traceability is a product feature. | Validated |
+| FLH-F-012 | The harness shall expose a high-level operator CLI for application lifecycle, single-run execution, eval execution, diagnostics, and updates. | Formloop owns an operator CLI separate from `cad-cli`. | Validated |
+| FLH-F-013 | The operator CLI shall support `formloop ui start`, `formloop ui stop`, `formloop ui status`, `formloop run`, `formloop eval run`, `formloop eval report`, `formloop doctor`, and `formloop update`. | These are the agreed primary operator surfaces. | Validated |
+| FLH-F-014 | The harness shall support developer eval runs over datasets with known ground-truth geometry. | Developer evals are a first-class system capability. | Validated |
+| FLH-F-015 | The harness shall combine deterministic eval metrics with structured LLM judge outputs. | Both deterministic evidence and higher-level assessment are required. | Validated |
+| FLH-F-016 | The Design Researcher shall be able to perform internet research through OpenAI search-enabled requests. | Standards, conventions, and part facts may require external research. | Implemented |
+| FLH-F-017 | The manager shall be able to identify required research topics without being required to execute each research task directly. | The harness may orchestrate research fan-out on the manager's behalf. | Validated |
+| FLH-F-018 | The harness shall support application-orchestrated concurrent research execution for independent research branches. | Independent research work should be parallelizable without surrendering control to planner-style tool use. | Validated |
+| FLH-F-019 | The harness shall always attempt to produce at least one delivered revision through the run-and-review loop. | The product should bias toward a real design attempt rather than a question-first dead end. | Validated |
+| FLH-F-020 | When design intent is incomplete but the likely direction is still inferable, the manager shall record explicit assumptions in structured state and proceed. | v1 should tolerate ambiguity without stalling unnecessarily. | Validated |
+| FLH-F-021 | The harness shall use `run > revision` as its top-level persistence model. | This is the agreed lifecycle abstraction. | Validated |
+| FLH-F-022 | A revision shall exist only after a candidate artifact bundle has been generated and persisted within a run. | Revisions should represent inspectable candidate outputs, not every internal step. | Validated |
+| FLH-F-023 | The harness shall use human-readable sequential naming for persisted runs and revisions, while allowing hashes or opaque identifiers as secondary unique IDs where needed. | Stored results should be easy to inspect and naturally sort. | Validated |
+| FLH-F-024 | The harness shall emit LLM-generated progress updates at meaningful milestones and expose them as pollable structured events. | The user explicitly wants breadcrumb-style explanations of what the harness is doing and why. | Validated |
+| FLH-F-025 | The harness shall expose a stable HTTP programmatic interface through which clients can create runs, poll current run snapshots and events, and retrieve run artifacts and review outputs. | The UI is a separate build and needs a clean contract boundary. | Validated |
 
 ### Non-functional requirements
 
 | ID | Requirement | Rationale | Status |
 | -- | ----------- | --------- | ------ |
-| FLH-NF-001 | The harness shall optimize for autonomy while maintaining safety, reliability, and inspectability. | The product should move forward aggressively without becoming opaque or fragile. | Proposed |
-| FLH-NF-002 | The harness shall preserve artifact and decision traceability across prompt, spec, research, revisions, review outputs, and eval outputs. | Closed-loop validation depends on being able to inspect how the system got to an answer. | Proposed |
-| FLH-NF-003 | The harness shall support reproducible eval execution suitable for before-and-after comparison. | The system should grow with a repeatable eval culture. | Proposed |
-| FLH-NF-004 | The harness shall remain operable through its CLI and HTTP interfaces even when the UI is not running. | Headless and automation-friendly operation remain required. | Proposed |
-| FLH-NF-005 | The harness shall keep the deterministic workflow in application code and use agents for adaptive reasoning rather than making the entire workflow model-directed. | A harness-first architecture is easier to test, debug, and control. | Proposed |
-| FLH-NF-006 | The harness shall emit progress information in a polling-friendly format consisting of structured events and materialized snapshots rather than relying on a streaming-only contract. | The v1 UI and tooling model is polling-based. | Proposed |
-| FLH-NF-007 | The harness shall expose enough structured logs, traces, and stored outputs to debug failures in normal runs and eval runs. | Diagnosability is required for development and operator trust. | Proposed |
-| FLH-NF-008 | The harness should keep configuration and context surfaces intentionally small so the system stays maintainable. | The simplification effort is explicitly trying to reduce over-specification and accidental complexity. | Proposed |
-| FLH-NF-009 | The harness shall note and avoid wasteful repeated model or render work when behavior changes would materially increase cost. | Cost discipline is part of the operating model. | Proposed |
+| FLH-NF-001 | The harness shall optimize for autonomy while maintaining safety, reliability, and inspectability. | The product should move forward aggressively without becoming opaque or fragile. | Implemented |
+| FLH-NF-002 | The harness shall preserve artifact and decision traceability across prompt, spec, research, revisions, review outputs, and eval outputs. | Closed-loop validation depends on being able to inspect how the system got to an answer. | Validated |
+| FLH-NF-003 | The harness shall support reproducible eval execution suitable for before-and-after comparison. | The system should grow with a repeatable eval culture. | Validated |
+| FLH-NF-004 | The harness shall remain operable through its CLI and HTTP interfaces even when the UI is not running. | Headless and automation-friendly operation remain required. | Validated |
+| FLH-NF-005 | The harness shall keep the deterministic workflow in application code and use agents for adaptive reasoning rather than making the entire workflow model-directed. | A harness-first architecture is easier to test, debug, and control. | Validated |
+| FLH-NF-006 | The harness shall emit progress information in a polling-friendly format consisting of structured events and materialized snapshots rather than relying on a streaming-only contract. | The v1 UI and tooling model is polling-based. | Validated |
+| FLH-NF-007 | The harness shall expose enough structured logs, traces, and stored outputs to debug failures in normal runs and eval runs. | Diagnosability is required for development and operator trust. | Validated |
+| FLH-NF-008 | The harness should keep configuration and context surfaces intentionally small so the system stays maintainable. | The simplification effort is explicitly trying to reduce over-specification and accidental complexity. | Implemented |
+| FLH-NF-009 | The harness shall note and avoid wasteful repeated model or render work when behavior changes would materially increase cost. | Cost discipline is part of the operating model. | Implemented |
 
 ### Design and technical constraint requirements
 
 | ID | Requirement | Rationale | Status |
 | -- | ----------- | --------- | ------ |
-| FLH-D-001 | The harness shall use `cad-cli` as its deterministic CAD tool substrate rather than embedding those responsibilities directly. | Formloop should orchestrate deterministic CAD work, not duplicate it. | Proposed |
-| FLH-D-002 | The harness shall use build123d as the primary modeling backend exposed through Formloop workflows. | This remains a core technical decision. | Proposed |
-| FLH-D-003 | The harness shall treat STEP as the authoritative geometry artifact and GLB as the primary presentation artifact. | This is the agreed artifact split. | Proposed |
-| FLH-D-004 | The harness shall expose a centralized internal runtime abstraction for CLI execution, constrained Python execution, artifact reads, and artifact writes. | The runtime boundary should stay small and explicit. | Proposed |
-| FLH-D-005 | The harness shall not require a separate broker service in v1. | The architecture intentionally favors a smaller runtime. | Proposed |
-| FLH-D-006 | The harness shall represent the current design state explicitly rather than reconstructing it from chat history alone. | The manager, review loop, and UI all depend on explicit state. | Proposed |
-| FLH-D-007 | The harness shall use the OpenAI Agents SDK as its required agent orchestration framework. | OpenAI Agents SDK is the chosen implementation path. | Proposed |
-| FLH-D-008 | OpenAI-backed runs shall use the OpenAI Responses path by default. | This is the preferred OpenAI execution path for v1. | Proposed |
-| FLH-D-009 | The harness shall optimize for OpenAI-only execution in v1 and shall not require a multi-provider abstraction. | The simplification effort intentionally removes multi-provider scope. | Proposed |
-| FLH-D-010 | Each agent shall be defined in its own Python module with detailed instructions, explicit tool access, an explicit model choice, and structured output where useful. | Specialist behavior should be explicit and versionable in code. | Proposed |
-| FLH-D-011 | The harness shall keep deterministic orchestration in application code while using agents for adaptive inner steps such as interpretation, research, CAD authoring, and review. | This formalizes the harness-first architecture. | Proposed |
-| FLH-D-012 | Parallel specialist work shall be orchestrated by application code and used only when branch independence is clear. | Parallelism should be deliberate and safe. | Proposed |
-| FLH-D-013 | The harness shall keep run context separate from prompt context so internal identifiers, handles, caches, and other application state can remain outside model-visible input unless needed. | This is an important architectural boundary for correctness and safety. | Proposed |
-| FLH-D-014 | The harness shall maintain a checked-in non-secret configuration file for runtime defaults at the repo root as `formloop.harness.toml`. | Runtime defaults should be explicit, shareable, and inspectable. | Proposed |
-| FLH-D-015 | Secrets shall be supplied through environment variables only and shall not be committed to the repository. | Secret handling should stay simple and safe. | Proposed |
-| FLH-D-016 | Environment variable support shall include at minimum `OPENAI_API_KEY`. | v1 is OpenAI-only. | Proposed |
-| FLH-D-017 | The harness shall support checked-in named profiles for at least `normal` and `dev_test`. | The configuration surface should stay intentionally small. | Proposed |
-| FLH-D-018 | Developer eval runs shall use the `normal` profile unless a later requirement introduces a dedicated alternative. | A separate `eval` profile is intentionally out of scope for now. | Proposed |
-| FLH-D-019 | The programmatic interface shall be HTTP-only in v1 and shall use asynchronous job semantics with polling. | The UI and tooling model is polling-based HTTP. | Proposed |
-| FLH-D-020 | The runtime abstraction shall capture and parse structured JSON from `cad-cli` stdout for each command it invokes. | `cad-cli` is a structured contract, not an ad hoc text interface. | Proposed |
-| FLH-D-021 | The repository shall maintain checked-in schemas for the core persisted state, API, and report contracts needed by v1. | The core machine-readable contracts should be versioned in the repo. | Proposed |
-| FLH-D-022 | The initial schema set shall cover at minimum run, revision, artifact manifest, run snapshot, progress event, review summary, deterministic metrics output, judge output, and the basic create-run request and response contracts. | These are the minimum stable contracts for the simplified v1 surface. | Proposed |
-| FLH-D-023 | The runtime artifact tree shall live under `var/runs/` with one run folder containing run-level state and nested revision folders containing complete persisted revision bundles. | Filesystem conventions need to be stable across CLI, UI, and eval workflows. | Proposed |
-| FLH-D-024 | The default revision bundle shall include STEP, GLB, per-view PNGs, a render-sheet PNG, revision metadata JSON, artifact-manifest JSON, and review output after review completes. | Revision completeness needs a concrete baseline. | Proposed |
+| FLH-D-001 | The harness shall use `cad-cli` as its deterministic CAD tool substrate rather than embedding those responsibilities directly. | Formloop should orchestrate deterministic CAD work, not duplicate it. | Validated |
+| FLH-D-002 | The harness shall use build123d as the primary modeling backend exposed through Formloop workflows. | This remains a core technical decision. | Validated |
+| FLH-D-003 | The harness shall treat STEP as the authoritative geometry artifact and GLB as the primary presentation artifact. | This is the agreed artifact split. | Validated |
+| FLH-D-004 | The harness shall expose a centralized internal runtime abstraction for CLI execution, constrained Python execution, artifact reads, and artifact writes. | The runtime boundary should stay small and explicit. | Validated |
+| FLH-D-005 | The harness shall not require a separate broker service in v1. | The architecture intentionally favors a smaller runtime. | Validated |
+| FLH-D-006 | The harness shall represent the current design state explicitly rather than reconstructing it from chat history alone. | The manager, review loop, and UI all depend on explicit state. | Validated |
+| FLH-D-007 | The harness shall use the OpenAI Agents SDK as its required agent orchestration framework. | OpenAI Agents SDK is the chosen implementation path. | Validated |
+| FLH-D-008 | OpenAI-backed runs shall use the OpenAI Responses path by default. | This is the preferred OpenAI execution path for v1. | Validated |
+| FLH-D-009 | The harness shall optimize for OpenAI-only execution in v1 and shall not require a multi-provider abstraction. | The simplification effort intentionally removes multi-provider scope. | Validated |
+| FLH-D-010 | Each agent shall be defined in its own Python module with detailed instructions, explicit tool access, an explicit model choice, and structured output where useful. | Specialist behavior should be explicit and versionable in code. | Validated |
+| FLH-D-011 | The harness shall keep deterministic orchestration in application code while using agents for adaptive inner steps such as interpretation, research, CAD authoring, and review. | This formalizes the harness-first architecture. | Validated |
+| FLH-D-012 | Parallel specialist work shall be orchestrated by application code and used only when branch independence is clear. | Parallelism should be deliberate and safe. | Validated |
+| FLH-D-013 | The harness shall keep run context separate from prompt context so internal identifiers, handles, caches, and other application state can remain outside model-visible input unless needed. | This is an important architectural boundary for correctness and safety. | Validated |
+| FLH-D-014 | The harness shall maintain a checked-in non-secret configuration file for runtime defaults at the repo root as `formloop.harness.toml`. | Runtime defaults should be explicit, shareable, and inspectable. | Validated |
+| FLH-D-015 | Secrets shall be supplied through environment variables only and shall not be committed to the repository. | Secret handling should stay simple and safe. | Validated |
+| FLH-D-016 | Environment variable support shall include at minimum `OPENAI_API_KEY`. | v1 is OpenAI-only. | Validated |
+| FLH-D-017 | The harness shall support checked-in named profiles for at least `normal` and `dev_test`. | The configuration surface should stay intentionally small. | Validated |
+| FLH-D-018 | Developer eval runs shall use the `normal` profile unless a later requirement introduces a dedicated alternative. | A separate `eval` profile is intentionally out of scope for now. | Validated |
+| FLH-D-019 | The programmatic interface shall be HTTP-only in v1 and shall use asynchronous job semantics with polling. | The UI and tooling model is polling-based HTTP. | Validated |
+| FLH-D-020 | The runtime abstraction shall capture and parse structured JSON from `cad-cli` stdout for each command it invokes. | `cad-cli` is a structured contract, not an ad hoc text interface. | Validated |
+| FLH-D-021 | The repository shall maintain checked-in schemas for the core persisted state, API, and report contracts needed by v1. | The core machine-readable contracts should be versioned in the repo. | Validated |
+| FLH-D-022 | The initial schema set shall cover at minimum run, revision, artifact manifest, run snapshot, progress event, review summary, deterministic metrics output, judge output, and the basic create-run request and response contracts. | These are the minimum stable contracts for the simplified v1 surface. | Validated |
+| FLH-D-023 | The runtime artifact tree shall live under `var/runs/` with one run folder containing run-level state and nested revision folders containing complete persisted revision bundles. | Filesystem conventions need to be stable across CLI, UI, and eval workflows. | Validated |
+| FLH-D-024 | The default revision bundle shall include STEP, GLB, per-view PNGs, a render-sheet PNG, revision metadata JSON, artifact-manifest JSON, and review output after review completes. | Revision completeness needs a concrete baseline. | Validated |
 
 ### Validation and UAT requirements
 
 | ID | Requirement | Rationale | Status |
 | -- | ----------- | --------- | ------ |
-| FLH-V-001 | The harness shall maintain full unit-test coverage over deterministic logic, schema and config parsing, and run-state serialization behavior. | Unit coverage should be comprehensive for deterministic code and contracts. | Proposed |
-| FLH-V-002 | The harness shall maintain integration coverage for agent orchestration, runtime and tool boundaries, persistence, HTTP API behavior, and artifact generation. | Cross-boundary behavior is central to the product. | Proposed |
-| FLH-V-003 | The harness shall run smoke tests, end-to-end UAT, and operator-style validation whenever those tests materially help development, not only during pull-request workflows. | Real tool use should happen whenever it improves confidence and learning. | Proposed |
-| FLH-V-004 | Critical user and operator flows shall be maintained in [SPEC.md](SPEC.md). | The simplified spec should hold the essential UAT narrative. | Proposed |
-| FLH-V-005 | UAT for critical flows shall include actually using the harness the way an end user or operator would and inspecting whether the delivered part matches the requested outcome. | The user explicitly wants tool-using validation, not documentation-only checklists. | Proposed |
-| FLH-V-006 | Validation shall inspect surfaced outputs, persisted artifacts, review outputs, and visible quirks or failures rather than stopping at successful command completion. | Evidence at the system boundary matters more than internal confidence. | Proposed |
-| FLH-V-007 | The harness shall validate `cad-cli` compatibility and schema-contract conformance as part of preflight and integration coverage. | The system depends on stable structured contracts. | Proposed |
-| FLH-V-008 | Eval validation shall confirm per-case artifacts, deterministic metrics, judge outputs, and aggregate reporting outputs. | Eval quality needs concrete proof at both per-case and batch levels. | Proposed |
+| FLH-V-001 | The harness shall maintain full unit-test coverage over deterministic logic, schema and config parsing, and run-state serialization behavior. | Unit coverage should be comprehensive for deterministic code and contracts. | Validated |
+| FLH-V-002 | The harness shall maintain integration coverage for agent orchestration, runtime and tool boundaries, persistence, HTTP API behavior, and artifact generation. | Cross-boundary behavior is central to the product. | Validated |
+| FLH-V-003 | The harness shall run smoke tests, end-to-end UAT, and operator-style validation whenever those tests materially help development, not only during pull-request workflows. | Real tool use should happen whenever it improves confidence and learning. | Validated |
+| FLH-V-004 | Critical user and operator flows shall be maintained in [SPEC.md](SPEC.md). | The simplified spec should hold the essential UAT narrative. | Validated |
+| FLH-V-005 | UAT for critical flows shall include actually using the harness the way an end user or operator would and inspecting whether the delivered part matches the requested outcome. | The user explicitly wants tool-using validation, not documentation-only checklists. | Validated |
+| FLH-V-006 | Validation shall inspect surfaced outputs, persisted artifacts, review outputs, and visible quirks or failures rather than stopping at successful command completion. | Evidence at the system boundary matters more than internal confidence. | Validated |
+| FLH-V-007 | The harness shall validate `cad-cli` compatibility and schema-contract conformance as part of preflight and integration coverage. | The system depends on stable structured contracts. | Validated |
+| FLH-V-008 | Eval validation shall confirm per-case artifacts, deterministic metrics, judge outputs, and aggregate reporting outputs. | Eval quality needs concrete proof at both per-case and batch levels. | Validated |
 
 ### Configuration and runtime contract
 

@@ -2,3 +2,9 @@
 .env.local
 .env.*
 !.env.example
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+var/

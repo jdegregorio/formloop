@@ -1,0 +1,41 @@
+{
+  "$defs": {
+    "RunStatus": {
+      "enum": [
+        "created",
+        "running",
+        "awaiting_review",
+        "completed",
+        "failed"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "run_name": {
+      "title": "Run Name",
+      "type": "string"
+    },
+    "snapshot_path": {
+      "title": "Snapshot Path",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus"
+    }
+  },
+  "required": [
+    "run_id",
+    "run_name",
+    "status",
+    "snapshot_path"
+  ],
+  "title": "RunCreateResponse",
+  "type": "object"
+}

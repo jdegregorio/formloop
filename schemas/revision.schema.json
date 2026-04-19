@@ -1,0 +1,149 @@
+{
+  "$defs": {
+    "NormalizedSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "assumptions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "dimensions_constraints": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dimensions Constraints",
+          "type": "array"
+        },
+        "fit_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fit Requirements",
+          "type": "array"
+        },
+        "form_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Form Requirements",
+          "type": "array"
+        },
+        "function_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Function Requirements",
+          "type": "array"
+        },
+        "intent_summary": {
+          "title": "Intent Summary",
+          "type": "string"
+        },
+        "open_questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Questions",
+          "type": "array"
+        },
+        "optional_reference_image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Optional Reference Image"
+        },
+        "required_features": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Features",
+          "type": "array"
+        }
+      },
+      "required": [
+        "intent_summary"
+      ],
+      "title": "NormalizedSpec",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_manifest_path": {
+      "title": "Artifact Manifest Path",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "ordinal": {
+      "title": "Ordinal",
+      "type": "integer"
+    },
+    "review_summary_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review Summary Path"
+    },
+    "revision_id": {
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "revision_name": {
+      "title": "Revision Name",
+      "type": "string"
+    },
+    "spec_snapshot": {
+      "$ref": "#/$defs/NormalizedSpec"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "trigger": {
+      "title": "Trigger",
+      "type": "string"
+    },
+    "workspace_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workspace Path"
+    }
+  },
+  "required": [
+    "revision_id",
+    "revision_name",
+    "ordinal",
+    "trigger",
+    "status",
+    "spec_snapshot",
+    "artifact_manifest_path"
+  ],
+  "title": "RevisionRecord",
+  "type": "object"
+}

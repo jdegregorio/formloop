@@ -1,0 +1,350 @@
+{
+  "$defs": {
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "url"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "NormalizedSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "assumptions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "dimensions_constraints": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dimensions Constraints",
+          "type": "array"
+        },
+        "fit_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fit Requirements",
+          "type": "array"
+        },
+        "form_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Form Requirements",
+          "type": "array"
+        },
+        "function_requirements": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Function Requirements",
+          "type": "array"
+        },
+        "intent_summary": {
+          "title": "Intent Summary",
+          "type": "string"
+        },
+        "open_questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Questions",
+          "type": "array"
+        },
+        "optional_reference_image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Optional Reference Image"
+        },
+        "required_features": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Features",
+          "type": "array"
+        }
+      },
+      "required": [
+        "intent_summary"
+      ],
+      "title": "NormalizedSpec",
+      "type": "object"
+    },
+    "ResearchFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "topic_id": {
+          "title": "Topic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "topic_id",
+        "summary"
+      ],
+      "title": "ResearchFinding",
+      "type": "object"
+    },
+    "RevisionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_manifest_path": {
+          "title": "Artifact Manifest Path",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "ordinal": {
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "review_summary_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Summary Path"
+        },
+        "revision_id": {
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "revision_name": {
+          "title": "Revision Name",
+          "type": "string"
+        },
+        "spec_snapshot": {
+          "$ref": "#/$defs/NormalizedSpec"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "trigger": {
+          "title": "Trigger",
+          "type": "string"
+        },
+        "workspace_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspace Path"
+        }
+      },
+      "required": [
+        "revision_id",
+        "revision_name",
+        "ordinal",
+        "trigger",
+        "status",
+        "spec_snapshot",
+        "artifact_manifest_path"
+      ],
+      "title": "RevisionRecord",
+      "type": "object"
+    },
+    "RunStatus": {
+      "enum": [
+        "created",
+        "running",
+        "awaiting_review",
+        "completed",
+        "failed"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact_references": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Artifact References",
+      "type": "object"
+    },
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "current_revision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Revision Id"
+    },
+    "current_spec": {
+      "$ref": "#/$defs/NormalizedSpec"
+    },
+    "current_status_summary": {
+      "title": "Current Status Summary",
+      "type": "string"
+    },
+    "effective_model": {
+      "title": "Effective Model",
+      "type": "string"
+    },
+    "effective_profile": {
+      "title": "Effective Profile",
+      "type": "string"
+    },
+    "effective_reasoning": {
+      "title": "Effective Reasoning",
+      "type": "string"
+    },
+    "input_summary": {
+      "title": "Input Summary",
+      "type": "string"
+    },
+    "progress_events": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Progress Events",
+      "type": "array"
+    },
+    "prompt": {
+      "title": "Prompt",
+      "type": "string"
+    },
+    "reference_image": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Image"
+    },
+    "research_findings": {
+      "items": {
+        "$ref": "#/$defs/ResearchFinding"
+      },
+      "title": "Research Findings",
+      "type": "array"
+    },
+    "review_outputs": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Review Outputs",
+      "type": "object"
+    },
+    "revisions": {
+      "items": {
+        "$ref": "#/$defs/RevisionRecord"
+      },
+      "title": "Revisions",
+      "type": "array"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "run_name": {
+      "title": "Run Name",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus",
+      "default": "created"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "run_name",
+    "prompt",
+    "input_summary",
+    "effective_profile",
+    "effective_model",
+    "effective_reasoning",
+    "current_spec",
+    "current_status_summary"
+  ],
+  "title": "RunRecord",
+  "type": "object"
+}

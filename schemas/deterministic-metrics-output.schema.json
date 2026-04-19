@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "EvalPassStatus": {
+      "enum": [
+        "pass",
+        "fail",
+        "warning"
+      ],
+      "title": "EvalPassStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "candidate_summary": {
+      "additionalProperties": true,
+      "title": "Candidate Summary",
+      "type": "object"
+    },
+    "case_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Case Id"
+    },
+    "compare_metrics": {
+      "additionalProperties": true,
+      "title": "Compare Metrics",
+      "type": "object"
+    },
+    "ground_truth_summary": {
+      "additionalProperties": true,
+      "title": "Ground Truth Summary",
+      "type": "object"
+    },
+    "pass_status": {
+      "$ref": "#/$defs/EvalPassStatus",
+      "default": "warning"
+    },
+    "pass_thresholds": {
+      "additionalProperties": true,
+      "title": "Pass Thresholds",
+      "type": "object"
+    },
+    "revision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Revision Id"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    }
+  },
+  "title": "DeterministicMetricsOutput",
+  "type": "object"
+}
