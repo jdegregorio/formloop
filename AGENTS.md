@@ -88,7 +88,7 @@ Validate:
 - retry/revision logic where relevant
 - persistence of run state and artifacts
 - manager behavior stays focused on spec management and routing, not heavy CAD authoring
-- distinction between Review Specialist and Eval Specialist remains intact
+- distinction between normal design review and developer eval remains intact, even when one specialist handles both
 
 ### For artifact pipeline changes
 
@@ -246,17 +246,17 @@ Ask before:
 - keep the runtime abstraction small: run CLI commands, run constrained Python, read artifacts, write artifacts
 - the v1 harness should be multi-agent but intentionally small and controlled
 - the manager maintains the active fit, form, and function spec and routes work, but should not do heavy CAD authoring directly
-- preserve the distinction between the internal Review Specialist loop and the Eval Specialist benchmarking/CI role
+- preserve the distinction between internal design review and developer eval behavior, even if one specialist covers both modes
 - maintain a separate high-level `formloop` operator CLI for app lifecycle, runs, evals, diagnostics, and updates
 - standardize authoritative, presentation, internal-review, and eval artifacts early
 - CI on `main` should run meaningful batch evals, while PRs should run a smaller smoke subset
-- keep manufacturing and slicer validation outside the core loop unless and until `cad validate` is intentionally added
+- keep optional downstream validation outside the core loop unless intentionally added later
 
 ## Internal review loop expectations
 
 In normal user design runs, there is usually no ground-truth STEP file.
 
-The Review Specialist should therefore judge candidates against:
+The Quality Specialist should therefore judge candidates against:
 
 - the normalized current spec
 - the produced geometry
@@ -287,21 +287,21 @@ Expected structured review output includes:
 
 The review loop is allowed to be iterative and tool-using. A good review agent may inspect dimensions, request more views, compare silhouettes, and only then decide whether to revise.
 
-## Skill expectations
+## Specialist context expectations
 
-Skills are reusable capability guides, not tiny macros.
+Specialist context should be reusable and explicit, not hidden in ad hoc prompts.
 
-When creating or updating skills for this repo, include:
+When creating or updating reusable specialist guidance for this repo, include:
 
 - purpose and scope
-- which agent uses the skill
+- which agent uses the guidance
 - relevant tools and commands
 - common workflows
 - conventions
 - common failures and recovery patterns
 - expected artifacts
 
-Suggested v1 skill areas:
+Suggested v1 capability areas:
 
 - `build123d_modeling`
 - `cad_artifact_conventions`

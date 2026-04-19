@@ -1,100 +1,159 @@
-## Repo spec: Formloop
+## Repo Spec: Formloop
 
 ### Purpose
 
-Formloop is the main application repo. Its role is to turn user intent into managed design work by orchestrating agents, maintaining state, invoking `cad-cli`, presenting results, and running developer evals. It is the system that feels like the product.
+Formloop is the main application for an agentic CAD system. It turns natural-language design intent into managed CAD work by orchestrating agents, maintaining explicit design state, invoking `cad-cli`, presenting artifacts, and running developer evals.
 
-### What Formloop owns
+The product boundary is simple:
+
+- Formloop owns orchestration, state, UX, run history, and eval policy.
+- `cad-cli` owns deterministic CAD execution and artifact generation.
+
+### What Formloop Owns
 
 Formloop owns:
 
-* the manager agent
-* specialist agents
-* the constrained execution runtime
-* the chat and design-review UI
-* current design state
-* run and revision state
-* the internal design-loop review process
-* the high-level `formloop` CLI
-* dataset management
-* developer eval orchestration
-* run history and artifact plumbing
+- the manager agent
+- specialist agents
+- the harness runtime and orchestration logic
+- the chat and design-review UI
+- normalized current design state
+- run and revision persistence
+- review and eval policy
+- the `formloop` operator CLI
+- dataset and eval orchestration
+- artifact and traceability plumbing
 
-That means Formloop owns almost all workflow and product behavior, while `cad-cli` owns the deterministic CAD mechanics.
+Formloop should not duplicate deterministic geometry logic that belongs in `cad-cli`.
 
-### What Formloop does not own
+### Architecture
 
-Formloop should not directly own:
+#### Hub-and-Spoke Manager
 
-* low-level CAD execution primitives
-* renderer implementation details
-* comparison math implementation
-* artifact rendering internals
-* reusable CLI-level packaging logic
+Formloop shall use the OpenAI Agents SDK as its orchestration framework.
 
-Formloop should call into `cad-cli` for those capabilities.
+The v1 harness architecture is manager plus specialists exposed as bounded tools:
 
-### Agent and review responsibilities
+- **Manager**
+- **CAD Designer**
+- **Design Researcher**
+- **Quality Specialist**
 
-Formloop should use the manager-plus-specialists structure already agreed:
+The manager owns the user-facing objective and the final answer. Specialists do not take over the run. They are exposed to the manager as callable capabilities through `agent.as_tool()` or the equivalent SDK pattern so the manager keeps control of orchestration and output.
 
-* **Manager**
-* **CAD Designer**
-* **Design Researcher**
-* **Render Specialist**
-* **Review Specialist**
-* **Eval Specialist**
+Each agent should live in its own Python module with:
 
-Formloop shall use the OpenAI Agents SDK as its primary agent orchestration framework. OpenAI-backed runs should use the Responses path by default, while Anthropic-backed runs should be supported through the SDK's LiteLLM provider path.
+- a stable name
+- detailed instructions
+- an explicit tool surface
+- an explicit model choice
+- structured output when machine-readable results are useful
 
-The harness configuration surface should stay intentionally small and profile-based. At minimum it should provide checked-in `normal`, `dev_test`, and `eval` profiles with a shared thinking abstraction rather than exposing a broad matrix of provider-specific model controls.
+#### Deterministic Outer Workflow
 
-The primary execution lifecycle is `run > revision`. A run is the single persistent design thread for one part, project, or eval case, and a revision is one persisted candidate iteration inside that run.
+Formloop should follow a harness-first architecture.
 
-Before implementation begins, Formloop should check in versioned JSON Schemas for its primary state, API, and report contracts. Typed models may derive from those schemas later, but the checked-in schemas are the canonical v1 contract source. This first pass should fully define only the core run, revision, artifact-manifest, review-summary, and run-snapshot contracts, while keeping the remaining schemas intentionally simple.
+The application code owns deterministic workflow decisions such as:
 
-The key conceptual split inside Formloop is between two different review modes.
+- creating or resuming a run
+- maintaining the normalized current spec
+- deciding when to invoke specialists
+- deciding when to fan out independent research work
+- persisting artifacts and revision records
+- deciding whether to loop for another revision
+- deciding what to surface to the UI and CLI
 
-**Internal design-loop review** is for normal user runs with no ground-truth geometry. It should evaluate the latest candidate against the normalized spec, rendered views, deterministic inspections, and at most one optional user-provided reference image. It can be iterative and tool-using.
+Agents handle the adaptive parts inside that workflow:
 
-The rendered PNG views are passed to the review or judge LLMs as multimodal image inputs, and the core visual comparison is between those rendered images and (a) the normalized spec and (b) any user-provided reference image. The rendered images are managed as durable per-run, per-revision artifacts so the review loop, evals, and UI all consume the same underlying files.
+- interpreting design intent
+- researching standards or conventions
+- authoring CAD plans and tool calls
+- reviewing candidate outputs
+- synthesizing findings into user-facing updates
 
-**Developer eval review** is for benchmarking runs where ground-truth geometry exists. It should combine deterministic calculators with agent judges, and may allow tool-using judges when needed for structured assessments like dimensional compliance.
+This keeps the core run and revision loop controlled by the harness while still using agents for the fuzzy reasoning steps.
 
-That distinction belongs in Formloop, not in `cad-cli`, because it is fundamentally orchestration and evaluation policy rather than deterministic geometry tooling.
+#### Specialist Contracts
 
-The manager should attempt a first CAD iteration by default. It should only ask clarifying questions before first-pass generation when critical gaps make a credible initial model impossible, such as missing core function, blocking interfaces, or must-hit dimensions or tolerances. When proceeding under ambiguity, the manager should record explicit assumptions.
+The specialist roles are intentionally small:
 
-In interactive mode, clarification answers resume the blocked run in place. In non-interactive mode, critical-gap detection should move the run into `blocked_on_clarification` with a structured clarification event rather than quietly producing a weak first pass.
+- **CAD Designer** owns CAD authoring, artifact-oriented `cad-cli` usage, and revision execution.
+- **Design Researcher** owns external factual research and uses OpenAI search-enabled requests when web research is needed.
+- **Quality Specialist** owns both normal design review and developer eval judging, with different inputs depending on whether ground truth exists.
 
-A revision exists only after a candidate artifact bundle has been generated and persisted. Clarification, research, or spec cleanup alone do not create a revision. Revision ordinals remain monotonic within a run and do not reset after clarification or reopen.
+The Quality Specialist supports two modes:
 
-Runs are intentionally reopenable over time. A run may move from `blocked_on_clarification` or `completed` back to `active`, while preserving prior outcomes in status history for inspection.
+- normal design review against the current spec, artifacts, and optional reference image
+- developer eval review against ground-truth data plus deterministic metrics
 
-The CAD Designer should operate like a mechanical design engineer: standards-aware, manufacturable, and grounded in the current spec. It should proactively invoke the Design Researcher whenever named parts, mechanisms, standards, or conventions imply factual external knowledge that should guide the design.
+#### Parallel Research
 
-### UI responsibilities
+Independent research topics may be executed concurrently when the harness can prove the branches are independent. This concurrency should be orchestrated by the application, such as with `asyncio.gather`, rather than delegated to planner-style model behavior.
 
-The UI is a mostly independent build that integrates with the harness through its HTTP programmatic interface. Detailed UI requirements live in `REQUIREMENTS_UI.md`; harness-side requirements live in `REQUIREMENTS_HARNESS.md`.
+The manager may identify required research topics without personally performing every delegation step. The harness may translate those identified topics into concurrent research tasks and return the results to the manager for synthesis.
 
-Formloop should present a design-review workspace with these primary surfaces:
+#### Run Context vs Prompt Context
 
-* chat
-* current spec
-* an interactive GLB viewer for the latest candidate geometry (browser-native, Three.js via `GLTFLoader` as the recommended default, or `<model-viewer>` as an acceptable lighter option)
-* the harness-produced multi-view render sheet as a secondary reference alongside the interactive viewer
-* latest review summary
-* artifact downloads
+Formloop should keep internal state separate from model-visible prompt context.
 
-The interactive GLB viewer is the primary human-facing surface for geometry. The multi-view render sheet remains a first-class artifact because it is still the strongest visual signal for the agent-driven closed-loop review and is useful for human cross-reference. CAD-accurate measurement and feature interrogation belong on the harness side against STEP; the browser viewer is for mesh-level presentation only.
+- Prompt context is what the model needs to reason about the current turn.
+- Run context is what the application needs to track execution, state, identifiers, caches, and other internal handles.
 
-Detailed logs, tool calls, subagent history, and raw traces should exist, but remain collapsed by default. This keeps the UI intuitive while still making the system inspectable.
+Sensitive or low-signal internal state should stay in run context unless the model genuinely needs it.
 
-The programmatic interface is HTTP-only in v1 and uses asynchronous job semantics with polling. Clients poll for a current run snapshot plus append-only structured events rather than relying on streaming transports.
+### Run and Revision Model
 
-### CLI responsibilities
+The top-level lifecycle is `run > revision`.
 
-Formloop should expose the application/operator CLI:
+- A run is the persistent design or eval thread.
+- A revision is one persisted candidate iteration inside that run.
+
+The harness should attempt a real first design pass rather than centering the product around upfront questions. When requirements are incomplete but the likely direction is still inferable, the manager may make reasonable assumptions, record them in structured state, and proceed.
+
+The normal loop is:
+
+1. normalize the request into the active spec
+2. identify any research needed
+3. generate a candidate revision
+4. persist the revision bundle
+5. review the candidate
+6. revise again if the review indicates more work is needed
+7. deliver the latest revision and review outcome
+
+A revision exists only after a candidate artifact bundle has been generated and persisted.
+
+Runs and revisions should use human-readable sequential naming so stored results are easy to inspect and naturally sort in filesystem and UI views. Hashes may still exist as secondary unique identifiers when needed.
+
+### Artifacts
+
+Formloop should standardize artifacts early.
+
+- STEP is the authoritative geometry artifact.
+- GLB is the primary presentation artifact.
+- rendered PNG views and a render sheet are shared review and UI artifacts.
+- review outputs and eval outputs are persisted alongside revision data.
+
+Artifact bundles should remain easy to inspect after the fact so a run can be audited from prompt through delivered revision.
+
+### UI Responsibilities
+
+Detailed UI requirements live in [REQUIREMENTS_UI.md](REQUIREMENTS_UI.md).
+
+At a high level, the UI should present a design-review workspace built around:
+
+- chat
+- the normalized current spec
+- an interactive GLB viewer
+- render sheet and view images as secondary visual references
+- the latest review summary
+- artifact downloads
+- collapsed-by-default traceability surfaces
+
+The UI should consume a polling-friendly HTTP interface from the harness. Progress should be surfaced as structured events and LLM-generated milestone breadcrumbs rather than requiring a streaming-only transport.
+
+### CLI Responsibilities
+
+Formloop should expose a high-level operator CLI separate from the `cad` surface:
 
 ```bash
 formloop ui start
@@ -107,85 +166,60 @@ formloop doctor
 formloop update
 ```
 
-This CLI is for:
+This CLI owns:
 
-* app lifecycle
-* running a query outside the UI
-* batch eval execution
-* health checks
-* updating the app
+- app lifecycle
+- single-run execution outside the UI
+- eval execution
+- health checks
+- updating the app
 
-This is distinct from the `cad` command surface exposed by `cad-cli`.
+The CLI should be profile-aware, but v1 should keep profiles small:
 
-The CLI should be profile-aware and should support `--interactive` and `--no-interactive` on `formloop run`, with the CLI defaulting to non-interactive behavior.
+- `normal`
+- `dev_test`
 
-### Eval responsibilities
+Developer evals should use the `normal` profile unless a later requirement introduces a dedicated alternative.
+
+### Eval Responsibilities
 
 Formloop owns the dataset and benchmark layer.
 
-Each eval case should manage:
+Each eval case should carry the minimum information needed for repeatable benchmarking:
 
-* prompt
-* normalized spec
-* ground-truth STEP
-* optional reference image
-* tolerances
-* tags
+- prompt
+- normalized spec
+- ground-truth STEP
+- optional reference image
+- optional tolerances
+- tags
 
-Each eval run should combine:
+Each eval run should produce:
 
-* deterministic metrics from geometry and artifacts
-* structured agent-judge outputs
+- deterministic metrics JSON
+- judge outputs JSON
+- a short summary
+- per-case artifacts
+- aggregate reporting outputs
 
-The qualitative eval contract should score `requirement_adherence` and `feature_coverage` independently on a `0..4` scale, report an equal-weight average aggregate, and include confidence on a `0.0..1.0` scale.
+Formloop owns eval orchestration, scoring policy, aggregation, and failure surfacing even when deterministic geometry operations come from `cad-cli`.
 
-The deterministic geometry comparison contract should report shared volume, only-in-candidate volume, only-in-ground-truth volume, and composite IoU ratio.
+### Critical User and Operator Stories
 
-That means Formloop owns the policy and orchestration for eval scoring, aggregation, CI reporting, and failure surfacing, even though it relies on `cad-cli` for deterministic geometry operations.
+These stories define the essential v1 behavior:
 
-### Skills
-
-Formloop's skill system shall comply with the open Agent Skills standard ([agentskills.io](https://agentskills.io/home); see also OpenAI's tools/skills guide at [developers.openai.com](https://developers.openai.com/api/docs/guides/tools-skills)). Aligning with an open standard preserves interoperability across agent platforms and reduces lock-in to any single vendor's skill format.
-
-Versioned skills that invoke `cad-cli` should declare the stdout JSON fields they depend on, and the repository should declare one supported `cad-cli` release for preflight compatibility checks.
-
-### Quality expectations
-
-Formloop should prioritize:
-
-* safe, reliable execution
-* clean context boundaries
-* explicit current state
-* traceable artifacts
-* low-noise user experience
-* repeatable eval orchestration
-* strong separation between product workflow and deterministic tooling
+1. A user creates a new part from a prompt and receives a delivered revision with inspectable artifacts and review feedback.
+2. A user gives an ambiguous prompt, the manager makes reasonable assumptions, records them, and still produces a first revision.
+3. A request implies external standards or conventions, research is performed, and the findings inform the design before or during revision generation.
+4. Review feedback identifies issues, the loop produces another revision, and the updated revision is persisted and surfaced clearly.
+5. An operator runs an eval case against known truth and receives deterministic metrics, judge outputs, and aggregate reporting.
+6. An AI coding agent or operator performs end-to-end UAT by actually using the harness and inspecting whether the delivered part matches the requested outcome, including visible quirks or failures.
 
 ### Relationship with `cad-cli`
 
-#### Basic Summary
-The cleanest mental model is:
+The clean mental model is:
 
-**Formloop asks questions and manages decisions.**
-**`cad-cli` performs deterministic CAD work and returns artifacts plus structured JSON results.**
+- Formloop manages the design loop, eval loop, and product behavior.
+- `cad-cli` performs deterministic CAD work and returns artifacts plus structured JSON.
 
-##### `cad-cli`
-
-A reusable, deterministic CAD tool product that owns build, render, inspect, compare, and package operations, standardized around build123d, Blender, STEP, and GLB. It is headless, scriptable, CI-friendly, and usable outside Formloop.
-
-##### Formloop
-
-An agentic application that owns the manager and specialist harness, current design state, internal closed-loop review, developer eval orchestration, the UI, and the `formloop` application CLI. It uses `cad-cli` as its deterministic execution substrate.
-
-#### Normal Flow/Handoffs
-A normal flow should look like this:
-
-1. Formloop receives a request for a run.
-2. Formloop creates or resumes that run.
-3. Formloop updates the current spec.
-4. Formloop invokes `cad build`.
-5. Formloop invokes `cad render`.
-6. Formloop invokes `cad inspect` as needed for review.
-7. Formloop may invoke `cad compare` in developer evals or revision comparison flows.
-8. Formloop persists the current revision bundle.
-9. Formloop presents outputs, decides whether to revise, may later reopen the run if needed, and records state.
+Formloop should reach `cad-cli` through harness tools and runtime functions rather than quietly re-implementing those operations inside agent prompts or app logic.
