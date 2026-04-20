@@ -80,6 +80,87 @@ def _write_inspect_json(run_root: Path, attempt: int, payload: dict | None) -> P
     return path
 
 
+# ---- narration sanitization + fallback helpers ----------------------------
+#
+# Narrator inputs are required to stay free of file paths, run names, and
+# revision identifiers (FLH-D-025). We strip those defensively even though
+# the callers are supposed to curate what they pass in.
+
+
+import re as _re
+
+_FORBIDDEN_PATTERNS = (
+    _re.compile(r"run-\d+"),
+    _re.compile(r"rev-\d+"),
+    _re.compile(r"[/\\][\w./\\-]+\.(?:step|glb|png|json|py)"),
+    _re.compile(r"/var/[\w./\\-]+"),
+)
+
+
+def _scrub(text: str) -> str:
+    for pat in _FORBIDDEN_PATTERNS:
+        text = pat.sub("", text)
+    return text.strip()
+
+
+def _sanitize_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return _scrub(value)
+    if isinstance(value, list):
+        return [_sanitize_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _sanitize_value(v) for k, v in value.items()}
+    return value
+
+
+def _sanitize_context(ctx: dict[str, Any]) -> dict[str, Any]:
+    return {k: _sanitize_value(v) for k, v in ctx.items()}
+
+
+def _fallback_plan(plan: "ManagerPlan") -> str:
+    bits = []
+    if plan.assumptions:
+        first = plan.assumptions[0]
+        bits.append(f"resolved {len(plan.assumptions)} ambiguities (e.g. {first.topic})")
+    if plan.research_topics:
+        bits.append(f"lined up {len(plan.research_topics)} research topic(s)")
+    return (
+        "we normalized the spec: " + "; ".join(bits)
+        if bits
+        else "we normalized the spec"
+    )
+
+
+def _fallback_research(findings: list[dict], failures: int) -> str:
+    if not findings:
+        return "research complete"
+    topics = ", ".join(f.get("topic", "") for f in findings[:2] if f.get("topic"))
+    tail = f" ({failures} failed)" if failures else ""
+    return f"research on {topics}{tail}" if topics else f"research complete{tail}"
+
+
+def _fallback_revision_built(cad_out: "CadRevisionResult") -> str:
+    if not (cad_out.build_ok and cad_out.render_ok):
+        return "build or render did not complete cleanly; we'll retry"
+    dims = cad_out.dimensions or {}
+    size_bits = []
+    for key in ("overall", "size", "width", "length", "height"):
+        if key in dims:
+            size_bits.append(f"{key}={dims[key]}")
+            if len(size_bits) >= 2:
+                break
+    if size_bits:
+        return "designer landed on " + ", ".join(size_bits)
+    return "designer produced a clean build"
+
+
+def _fallback_review(review) -> str:
+    decision = review.decision.value if review.decision else "reviewed"
+    if review.key_findings:
+        return f"review {decision}: {review.key_findings[0][:160]}"
+    return f"review {decision}"
+
+
 class RunDriver:
     """Drives a single run through plan → research → revision loop → final."""
 
@@ -198,15 +279,9 @@ class RunDriver:
     # ---- phases ----------------------------------------------------------
 
     async def _plan(self, run, prompt: str, profile: Profile) -> ManagerPlan:
-        await self._narrate(
-            run.run_name,
-            phase="plan",
-            just_completed="received the user prompt",
-            next_step="normalize it into a concrete spec",
-            why="we want a structured target before any CAD work starts",
-            signals={},
-            fallback="planning the spec",
-        )
+        # No pre-plan narration — user already saw the prompt and the
+        # header. Wait until we have real content (the design brief and
+        # resolved assumptions) before narrating.
         agent = build_manager_plan(profile)
         result = await Runner.run(
             agent,
@@ -246,6 +321,8 @@ class RunDriver:
                 message=f"assumption: {a.topic}",
                 data={"topic": a.topic, "assumption": a.assumption},
             )
+        # Post-plan narration — now we actually have something specific
+        # to report: the design brief and any resolved ambiguities.
         await self._narrate(
             run.run_name,
             phase="plan",
@@ -255,16 +332,20 @@ class RunDriver:
                 if plan.research_topics
                 else "hand the spec to the CAD designer"
             ),
-            why=(
-                "we recorded a few assumptions where the prompt was ambiguous"
-                if plan.assumptions
-                else ""
-            ),
+            why="",
             signals={
                 "assumptions": len(plan.assumptions),
                 "research_topics": len(plan.research_topics),
             },
-            fallback="spec normalized",
+            context={
+                "design_brief": plan.design_brief,
+                "assumptions": [
+                    {"topic": a.topic, "assumption": a.assumption}
+                    for a in plan.assumptions[:4]
+                ],
+                "research_topics": list(plan.research_topics[:4]),
+            },
+            fallback=_fallback_plan(plan),
         )
         return plan
 
@@ -277,18 +358,8 @@ class RunDriver:
             message=f"researching {len(plan.research_topics)} topics",
             data={"topics": list(plan.research_topics)},
         )
-        await self._narrate(
-            run.run_name,
-            phase="research",
-            just_completed="planned the research topics",
-            next_step=(
-                f"look up {len(plan.research_topics)} topic"
-                f"{'s' if len(plan.research_topics) != 1 else ''} in parallel"
-            ),
-            why="parallel lookups keep the run snappy",
-            signals={"topic_count": len(plan.research_topics)},
-            fallback=f"researching {len(plan.research_topics)} topics",
-        )
+        # No pre-research narration — we'd just be restating the topic
+        # list. Wait until the findings come back so we can quote them.
         researcher = build_design_researcher(profile)
         tasks = [Runner.run(researcher, input=topic) for topic in plan.research_topics]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -319,7 +390,16 @@ class RunDriver:
                 else ""
             ),
             signals={"findings": len(findings), "failures": failures},
-            fallback="research complete",
+            context={
+                "research_findings": [
+                    {
+                        "topic": f.get("topic", ""),
+                        "summary": (f.get("summary", "") or "")[:280],
+                    }
+                    for f in findings[:4]
+                ],
+            },
+            fallback=_fallback_research(findings, failures),
         )
         return findings
 
@@ -344,27 +424,27 @@ class RunDriver:
                 message=f"revision attempt {attempt}",
                 data={"attempt": attempt},
             )
-            await self._narrate(
-                run.run_name,
-                phase="revision",
-                just_completed=(
-                    "reviewed the prior attempt"
-                    if prior_review is not None
-                    else "got the spec ready"
-                ),
-                next_step=(
-                    f"build revision attempt {attempt}"
-                    if attempt > 1
-                    else "build the first revision"
-                ),
-                why=(
-                    "the reviewer asked us to iterate"
-                    if prior_review is not None
-                    else "we always try at least one design pass"
-                ),
-                signals={"attempt": attempt, "max_attempts": max_revisions},
-                fallback=f"starting revision attempt {attempt}",
-            )
+            # Only narrate at the start of a revision when we're iterating
+            # on reviewer feedback — that carries run-specific content
+            # (what the reviewer asked us to change). The first attempt
+            # has nothing to report yet; we wait until the build is done.
+            if prior_review is not None:
+                await self._narrate(
+                    run.run_name,
+                    phase="revision",
+                    just_completed="read the reviewer's feedback",
+                    next_step=f"produce revision attempt {attempt}",
+                    why="",
+                    signals={"attempt": attempt, "max_attempts": max_revisions},
+                    context={
+                        "prior_decision": prior_review.get("decision"),
+                        "prior_key_findings": (prior_review.get("key_findings") or [])[:3],
+                        "revision_instructions": (
+                            prior_review.get("revision_instructions") or []
+                        )[:3],
+                    },
+                    fallback=f"starting revision attempt {attempt}",
+                )
             prompt_ctx = PromptContext(
                 input_summary=user_prompt,
                 current_spec=plan.normalized_spec,
@@ -401,11 +481,11 @@ class RunDriver:
             await self._narrate(
                 run.run_name,
                 phase="revision",
-                just_completed="ran the CAD designer",
+                just_completed="finished the CAD build and render",
                 next_step=(
-                    "persist the revision and send it to review"
+                    "send it to review"
                     if cad_out.build_ok and cad_out.render_ok
-                    else "retry — the build or render didn't complete cleanly"
+                    else "retry because the build or render failed"
                 ),
                 why="",
                 signals={
@@ -414,9 +494,13 @@ class RunDriver:
                     "render_ok": cad_out.render_ok,
                     "inspect_ok": cad_out.inspect_ok,
                 },
-                fallback=(
-                    f"designer build_ok={cad_out.build_ok} render_ok={cad_out.render_ok}"
-                ),
+                context={
+                    "revision_notes": (cad_out.revision_notes or "")[:280],
+                    "dimensions": dict(cad_out.dimensions or {}),
+                    "known_risks": list(cad_out.known_risks or [])[:3],
+                    "build_errors": list(cad_out.build_errors or [])[:2],
+                },
+                fallback=_fallback_revision_built(cad_out),
             )
 
             if not (
@@ -479,15 +563,8 @@ class RunDriver:
                 message=f"persisted {revision.revision_name}",
                 data={"revision": revision.revision_name, "ordinal": revision.ordinal},
             )
-            await self._narrate(
-                run.run_name,
-                phase="revision",
-                just_completed="saved the candidate artifacts",
-                next_step="hand it to the quality specialist for review",
-                why="",
-                signals={"attempt": attempt, "ordinal": revision.ordinal},
-                fallback="revision saved; reviewing",
-            )
+            # No narration here — persistence is pure bookkeeping. The
+            # post-review narration will carry the substantive update.
 
             review = await self._review(
                 run=run,
@@ -503,19 +580,9 @@ class RunDriver:
                     ProgressEventKind.breadcrumb,
                     message="revision accepted",
                 )
-                await self._narrate(
-                    run.run_name,
-                    phase="revision",
-                    just_completed="accepted the revision",
-                    next_step="synthesize the final answer for the user",
-                    why=(
-                        "the reviewer is confident in this design"
-                        if review.confidence and review.confidence >= 0.7
-                        else "the reviewer is comfortable handing this off"
-                    ),
-                    signals={"confidence": review.confidence},
-                    fallback="revision accepted",
-                )
+                # The post-review narration in _review already carried the
+                # review's findings and decision. Skip a second "accepted"
+                # narration here.
                 break
             prior_review = review.model_dump()
 
@@ -536,15 +603,9 @@ class RunDriver:
             ProgressEventKind.review_started,
             message=f"reviewing {revision.revision_name}",
         )
-        await self._narrate(
-            run.run_name,
-            phase="review",
-            just_completed="finished the build and render",
-            next_step="check the result against the spec",
-            why="",
-            signals={},
-            fallback="reviewing the revision",
-        )
+        # No pre-review narration — it would just restate the previous
+        # update. We wait until the review is done so we can quote what
+        # the reviewer actually found.
         reviewer = build_quality_specialist_review(profile)
         payload = {
             "spec": plan.normalized_spec,
@@ -577,22 +638,32 @@ class RunDriver:
         await self._narrate(
             run.run_name,
             phase="review",
-            just_completed="reviewed the revision",
+            just_completed="finished the review",
             next_step=(
                 "deliver this design"
                 if review.decision == ReviewDecision.pass_
-                else "iterate based on the review feedback"
+                else "iterate on the design"
             ),
-            why=(
-                review.key_findings[0]
-                if review.key_findings
-                else ""
-            ),
+            why="",
             signals={
                 "decision": review.decision.value,
                 "confidence": review.confidence,
             },
-            fallback=f"review decision: {review.decision.value}",
+            context={
+                "decision": review.decision.value,
+                "confidence": review.confidence,
+                "key_findings": list(review.key_findings or [])[:4],
+                "suspect_features": list(
+                    getattr(review, "suspect_or_missing_features", None) or []
+                )[:4],
+                "suspect_dimensions": list(
+                    getattr(review, "suspect_dimensions_to_recheck", None) or []
+                )[:4],
+                "revision_instructions": list(
+                    getattr(review, "revision_instructions", None) or []
+                )[:3],
+            },
+            fallback=_fallback_review(review),
         )
         return review
 
@@ -603,19 +674,8 @@ class RunDriver:
         delivered_rev_name: str | None,
         profile: Profile,
     ) -> ManagerFinalAnswer:
-        await self._narrate(
-            run.run_name,
-            phase="final",
-            just_completed=(
-                "settled on a design"
-                if delivered_rev_name
-                else "exhausted our revision attempts"
-            ),
-            next_step="write up what we delivered for the user",
-            why="",
-            signals={"delivered": bool(delivered_rev_name)},
-            fallback="synthesizing the final answer",
-        )
+        # No finalize narration — the manager's final answer is about to
+        # print below. A narration here would just be noise.
         fresh = self.store.load_run(run.run_name)
         snap = self.store.load_snapshot(run.run_name)
         payload = {
@@ -674,12 +734,14 @@ class RunDriver:
         why: str,
         signals: dict[str, Any],
         fallback: str,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Generate and emit a narration event.
 
         REQ: FLH-F-024, FLH-F-026, FLH-NF-010 — never aborts the run; on
         Narrator failure the static ``fallback`` is emitted with the error
-        recorded in ``narration_error``.
+        recorded in ``narration_error`` (in the event ``data``, not in the
+        user-facing ``message`` — the fallback string is shown instead).
         """
 
         payload = NarrationInput(
@@ -688,6 +750,7 @@ class RunDriver:
             next_step=next_step,
             why=why,
             signals=dict(signals),
+            context=_sanitize_context(context or {}),
         )
         try:
             text, err = await self.narrator.narrate(payload, fallback=fallback)
@@ -697,7 +760,11 @@ class RunDriver:
             run_name,
             ProgressEventKind.narration,
             text,
-            data={"phase": phase, "signals": dict(signals)},
+            data={
+                "phase": phase,
+                "signals": dict(signals),
+                "narration_error": err,  # debugging only — not user-facing
+            },
             phase=phase,
             narration_error=err,
         )

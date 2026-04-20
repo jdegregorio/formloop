@@ -131,12 +131,17 @@ async def test_narration_events_emitted_at_each_milestone(tmp_path, monkeypatch)
     narration = [ev for ev in events if ev.kind is ProgressEventKind.narration]
     phases = [ev.phase for ev in narration]
 
-    # plan-start, plan-end, revision-start, revision-built, final.
-    assert phases == ["plan", "plan", "revision", "revision", "final"], phases
+    # Post-op-feedback: we narrate only at milestones that carry run-specific
+    # content — plan-end (normalized spec + assumptions) and revision-built
+    # (designer output). No research (empty topics), no retry (first attempt),
+    # no review (designer stub fails so we never reach review), no finalize.
+    assert phases == ["plan", "revision"], phases
     # Fallback strings should be the captured messages (LLM is off).
-    assert any("planning" in ev.message for ev in narration)
     assert any("normalized" in ev.message for ev in narration)
-    assert any("designer" in ev.message or "build_ok" in ev.message for ev in narration)
+    assert any(
+        "build" in ev.message.lower() or "designer" in ev.message.lower()
+        for ev in narration
+    )
     # Snapshot reflects the latest one.
     snap = driver_snapshot(tmp_path, result["run_name"])
     assert snap["latest_narration"] == narration[-1].message

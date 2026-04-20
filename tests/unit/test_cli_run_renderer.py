@@ -58,18 +58,37 @@ def test_narration_renders_with_marker_in_plain_mode() -> None:
     assert "[plan]" in out
 
 
-def test_milestones_render_distinctly_from_narrations() -> None:
+def test_default_mode_suppresses_milestones_shows_narrations() -> None:
+    # Post-op-feedback: default mode must NOT print the dim milestone
+    # skeleton — only narrations survive in the live feed. Milestones
+    # stay in events.jsonl for debugging.
     r, buf = _renderer()
     r(_ev(1, ProgressEventKind.spec_normalized, "spec normalized"))
-    r(_ev(2, ProgressEventKind.narration, "we normalized the spec", phase="plan"))
-    lines = [line for line in buf.getvalue().splitlines() if line.strip()]
-    # Milestone uses the · marker; narration uses the › marker. Both must
-    # appear, and they must come from different lines (so the two event
-    # classes are visually distinct).
-    milestone_lines = [line for line in lines if "·" in line and "›" not in line]
-    narration_lines = [line for line in lines if "›" in line]
-    assert milestone_lines, lines
-    assert narration_lines, lines
+    r(_ev(2, ProgressEventKind.revision_built, "built", data={"build_ok": True}))
+    r(_ev(3, ProgressEventKind.review_completed, "", data={"decision": "pass"}))
+    r(_ev(4, ProgressEventKind.narration, "we normalized the spec", phase="plan"))
+    out = buf.getvalue()
+    assert "spec normalized" not in out
+    assert "review" not in out
+    assert "we normalized the spec" in out
+    assert "›" in out
+
+
+def test_verbose_mode_shows_milestones_with_indexed_payload() -> None:
+    r, buf = _renderer(verbose=True)
+    r(
+        _ev(
+            7,
+            ProgressEventKind.revision_built,
+            "built",
+            data={"build_ok": True, "dimensions": {"overall": "50×50×50 mm"}},
+        )
+    )
+    out = buf.getvalue()
+    assert "·" in out  # milestone marker visible
+    assert "build=ok" in out
+    assert "overall = 50×50×50 mm" in out
+    assert "idx=007" in out  # indexed payload footer
 
 
 def test_quiet_suppresses_narration_and_milestones() -> None:
@@ -86,21 +105,50 @@ def test_quiet_still_surfaces_failures() -> None:
     assert "✗" in buf.getvalue()
 
 
-def test_verbose_includes_data_payload() -> None:
+def test_verbose_trims_floating_point_noise_on_dimensions() -> None:
+    # CAD kernels emit values like 50.00000000000001 — render them as
+    # 50.0 so the verbose readout stays legible.
     r, buf = _renderer(verbose=True)
-    r(_ev(7, ProgressEventKind.revision_built, "built", data={"build_ok": True}))
+    r(
+        _ev(
+            1,
+            ProgressEventKind.revision_built,
+            "built",
+            data={"build_ok": True, "dimensions": {"width": 50.00000000000001}},
+        )
+    )
     out = buf.getvalue()
-    assert "[007]" in out
-    assert "revision_built" in out
-    assert '"build_ok": true' in out
+    assert "50.00000000000001" not in out
+    assert "width = 50.0" in out
+
+
+def test_narration_does_not_leak_narration_error_to_user() -> None:
+    # Post-op-feedback: the user must not see "(narrator fallback: ...)"
+    # — that string is for event logs / debugging only.
+    r, buf = _renderer()
+    r(
+        _ev(
+            2,
+            ProgressEventKind.narration,
+            "we normalized the spec",
+            phase="plan",
+            narration_error="timeout after 10.0s",
+        )
+    )
+    out = buf.getvalue()
+    assert "we normalized the spec" in out
+    assert "narrator fallback" not in out
+    assert "timeout" not in out
 
 
 def test_default_filters_low_signal_events() -> None:
+    # Default mode prints nothing but narrations and failures: the whole
+    # milestone stream stays quiet in the live feed.
     r, buf = _renderer()
-    # ``run_created`` and ``breadcrumb`` are intentionally suppressed in
-    # default mode — they're machine markers without operator value.
     r(_ev(0, ProgressEventKind.run_created, "run started"))
     r(_ev(1, ProgressEventKind.breadcrumb, "internal note"))
+    r(_ev(2, ProgressEventKind.spec_normalized, "spec normalized"))
+    r(_ev(3, ProgressEventKind.revision_built, "built", data={"build_ok": True}))
     assert buf.getvalue() == ""
 
 

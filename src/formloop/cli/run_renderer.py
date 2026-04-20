@@ -39,9 +39,18 @@ class RendererMode(str, Enum):
     verbose = "verbose"  # plain layout + raw data payloads
 
 
-# Structured events that are interesting enough to surface (dimmed) even
-# in default mode. Everything else is suppressed unless verbose.
-_DEFAULT_VISIBLE_KINDS: frozenset[ProgressEventKind] = frozenset(
+# In default mode we show only narrations + failures. Everything else —
+# the structured milestone skeleton of the run — is noise for an operator
+# who just wants to follow what's happening; it's useful for debugging
+# and telemetry but belongs behind ``--verbose``. Set via
+# FLH-F-027 after operator feedback that the dim milestone lines cluttered
+# the live feed next to the richer narrations.
+_DEFAULT_VISIBLE_KINDS: frozenset[ProgressEventKind] = frozenset()
+
+# Under ``--verbose`` we surface every structured event that carries
+# operator value. Narrator internals and pure bookkeeping (``run_created``,
+# ``breadcrumb``) stay suppressed unless the user dumps the events file.
+_VERBOSE_VISIBLE_KINDS: frozenset[ProgressEventKind] = frozenset(
     {
         ProgressEventKind.spec_normalized,
         ProgressEventKind.assumption_recorded,
@@ -88,6 +97,29 @@ def _terminal_width(default: int = 100) -> int:
         return max(40, shutil.get_terminal_size((default, 24)).columns)
     except Exception:
         return default
+
+
+def _format_value(value: object) -> str:
+    """Format a dimension / signal value for compact terminal display.
+
+    Floats that picked up ``.00000001`` numerical noise from the CAD
+    kernel get rounded to a friendly 3-decimal form. Lists and dicts are
+    stringified compactly.
+    """
+
+    if isinstance(value, float):
+        if abs(value - round(value)) < 1e-6:
+            return f"{value:.1f}"
+        return f"{value:.3f}".rstrip("0").rstrip(".")
+    if isinstance(value, list):
+        return "[" + ", ".join(_format_value(v) for v in value) + "]"
+    if isinstance(value, dict):
+        return (
+            "{"
+            + ", ".join(f"{k}={_format_value(v)}" for k, v in value.items())
+            + "}"
+        )
+    return str(value)
 
 
 def _wrap(text: str, *, width: int, initial_indent: str, subsequent_indent: str) -> str:
@@ -187,12 +219,19 @@ class EventRenderer:
             self._render_failure(event)
             return
 
-        if self.options.mode is RendererMode.verbose:
-            self._render_milestone_verbose(event)
+        # In default mode we suppress milestone lines entirely — they
+        # clutter the live feed. Verbose promotes them to visible.
+        visible = (
+            _VERBOSE_VISIBLE_KINDS
+            if self.options.mode is RendererMode.verbose
+            else _DEFAULT_VISIBLE_KINDS
+        )
+        if event.kind not in visible:
             return
 
-        if event.kind in _DEFAULT_VISIBLE_KINDS:
-            self._render_milestone(event)
+        self._render_milestone(event)
+        if self.options.mode is RendererMode.verbose and event.data:
+            self._render_data_payload(event)
 
     # ---- narration -----------------------------------------------------
 
@@ -227,10 +266,10 @@ class EventRenderer:
         if rest:
             line = line + "\n" + rest
         self._print(line)
-        if event.narration_error:
-            self._print(
-                self._color(_DIM, f"    (narrator fallback: {event.narration_error})")
-            )
+        # narration_error is kept on the event for debugging but is NEVER
+        # surfaced in the live feed — the fallback text has already been
+        # substituted into event.message so the user sees a coherent
+        # sentence, not a raw error.
         self._last_phase = event.phase
 
     # ---- milestones ----------------------------------------------------
@@ -287,10 +326,13 @@ class EventRenderer:
             self._render_milestone_line(text, width=width)
             dims = data.get("dimensions")
             if isinstance(dims, dict) and dims:
-                summary = ", ".join(
-                    f"{k}={v}" for k, v in list(dims.items())[:6]
-                )
-                self._render_indent_line(summary, width=width)
+                # Each dimension on its own indented line — avoids the
+                # ragged wrap we got when cramming everything onto one
+                # overlong line.
+                for k, v in list(dims.items())[:8]:
+                    self._render_indent_line(
+                        f"{k} = {_format_value(v)}", width=width
+                    )
             return
         if kind is ProgressEventKind.revision_persisted:
             rev = event.data.get("revision") or event.message
@@ -399,13 +441,30 @@ class EventRenderer:
         else:
             self._print(text)
 
-    def _render_milestone_verbose(self, event: ProgressEvent) -> None:
-        line = f"[{event.index:03d}] {event.kind.value}: {event.message}"
-        self._print(line)
-        if event.data:
-            import json
+    def _render_data_payload(self, event: ProgressEvent) -> None:
+        """In verbose mode, print a dim one-liner with index + data under
+        the pretty milestone line."""
 
-            self._print("  data: " + json.dumps(event.data, default=str))
+        # Skip keys we already surfaced in the pretty milestone line.
+        skip = {"phase", "signals", "narration_error"}
+        items = [
+            f"{k}={_format_value(v)}"
+            for k, v in event.data.items()
+            if k not in skip
+        ]
+        if not items:
+            idx = f"idx={event.index:03d}"
+            self._print(self._color(_DIM, f"      [{idx}]"))
+            return
+        payload = f"      [idx={event.index:03d}] " + ", ".join(items)
+        width = _terminal_width()
+        if len(payload) <= width:
+            self._print(self._color(_DIM, payload))
+            return
+        # Long payload: one key=value per line.
+        self._print(self._color(_DIM, f"      [idx={event.index:03d}]"))
+        for item in items:
+            self._print(self._color(_DIM, f"        {item}"))
 
 
 def make_renderer(

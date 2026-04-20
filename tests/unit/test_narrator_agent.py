@@ -58,7 +58,32 @@ def test_narration_input_round_trip() -> None:
 
 
 def test_narration_output_enforces_max_length() -> None:
-    # Pydantic-level constraint — keeps narrator outputs from drifting into
-    # walls of text that would break the in-place CLI rendering.
+    # Pydantic-level constraint — keeps narrator outputs bounded. Bumped
+    # from 400 → 500 to accommodate the richer, run-specific narrations
+    # the orchestrator now feeds via ``context`` (resolved ambiguities,
+    # review findings, dimension callouts).
     schema = NarrationOutput.model_json_schema()
-    assert schema["properties"]["text"]["maxLength"] == 400
+    assert schema["properties"]["text"]["maxLength"] == 500
+
+
+def test_narration_input_accepts_context_payload() -> None:
+    # Post-op-feedback: narrations need to weave in run-specific content,
+    # so ``NarrationInput`` now carries a free-form ``context`` dict the
+    # Narrator is told to quote from.
+    payload = NarrationInput(
+        phase="review",
+        just_completed="finished the review",
+        next_step="iterate on the design",
+        why="",
+        signals={"decision": "revise"},
+        context={
+            "key_findings": ["holes are 34mm instead of 35mm"],
+            "decision": "revise",
+        },
+    )
+    restored = NarrationInput.model_validate_json(payload.model_dump_json())
+    assert restored.context["key_findings"] == ["holes are 34mm instead of 35mm"]
+    # The agent instructions must explicitly tell the model to use context.
+    from formloop.agents.narrator import INSTRUCTIONS
+
+    assert "context" in INSTRUCTIONS.lower()
