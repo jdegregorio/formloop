@@ -26,6 +26,7 @@ class ProgressEventKind(str, Enum):
     review_started = "review_started"
     review_completed = "review_completed"
     breadcrumb = "breadcrumb"
+    narration = "narration"
     delivered = "delivered"
     run_failed = "run_failed"
 
@@ -33,12 +34,29 @@ class ProgressEventKind(str, Enum):
 class ProgressEvent(SchemaModel):
     """One append-only progress event.
 
-    ``message`` is human-friendly breadcrumb text (may be LLM-generated for
-    ``kind == breadcrumb``). ``data`` carries structured per-kind payload.
+    ``message`` is human-friendly text. For ``kind == narration`` it is the
+    LLM-written conversational status update (FLH-F-026); the orchestrator
+    falls back to a static string when the Narrator agent fails. ``data``
+    carries structured per-kind payload (e.g. ``phase``, ``signals``,
+    ``narration_error``).
     """
 
     index: int = Field(ge=0, description="Zero-based ordinal within the run.")
     kind: ProgressEventKind
     ts: str = Field(default_factory=utcnow_iso)
     message: str = ""
+    phase: str | None = Field(
+        default=None,
+        description=(
+            "Coarse phase tag (plan/research/revision/review/final/failure). "
+            "Always set for narration events; optional for milestone events."
+        ),
+    )
+    narration_error: str | None = Field(
+        default=None,
+        description=(
+            "Populated on narration events when the Narrator agent failed "
+            "and the static fallback message was substituted (FLH-NF-010)."
+        ),
+    )
     data: dict[str, Any] = Field(default_factory=dict)

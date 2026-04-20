@@ -89,6 +89,7 @@ def test_progress_event_kinds_cover_lifecycle() -> None:
         "spec_normalized",
         "revision_persisted",
         "review_completed",
+        "narration",
         "delivered",
         "run_failed",
     }
@@ -101,10 +102,30 @@ def test_progress_event_index_must_be_nonneg() -> None:
         ProgressEvent(index=-1, kind=ProgressEventKind.run_created)
 
 
+def test_progress_event_narration_round_trip() -> None:
+    # REQ: FLH-F-026 — narration carries phase + optional fallback error.
+    ev = ProgressEvent(
+        index=4,
+        kind=ProgressEventKind.narration,
+        message="we normalized the spec",
+        phase="plan",
+        narration_error=None,
+    )
+    blob = ev.model_dump_json()
+    restored = ProgressEvent.model_validate_json(blob)
+    assert restored == ev
+    assert restored.kind is ProgressEventKind.narration
+    assert restored.phase == "plan"
+
+
 def test_run_snapshot_default_artifacts_empty() -> None:
     snap = RunSnapshot(run_id="u", run_name="run-0001", status="running")
     assert snap.artifacts.step_path is None
     assert snap.last_event_index == -1
+    # REQ: FLH-F-026 — narration fields are present and default empty.
+    assert snap.latest_narration is None
+    assert snap.latest_narration_phase is None
+    assert snap.latest_narration_index is None
 
 
 def test_deterministic_metrics_optional_volumes() -> None:

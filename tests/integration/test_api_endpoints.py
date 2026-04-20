@@ -84,6 +84,15 @@ def _seed_run_with_revision(store: RunStore, tmp_path: Path):
     )
     store.append_event(
         run.run_name,
+        ProgressEvent(
+            index=0,
+            kind=ProgressEventKind.narration,
+            message="we settled on the cube",
+            phase="final",
+        ),
+    )
+    store.append_event(
+        run.run_name,
         ProgressEvent(index=0, kind=ProgressEventKind.delivered, message="done"),
     )
     return run, revision
@@ -108,6 +117,10 @@ async def test_snapshot_and_events_and_artifacts(tmp_path: Path) -> None:
         snap = r.json()
         assert snap["run_name"] == run.run_name
         assert snap["latest_review_decision"] == "pass"
+        # FLH-F-026 — latest narration is surfaced via /snapshot.
+        assert snap["latest_narration"] == "we settled on the cube"
+        assert snap["latest_narration_phase"] == "final"
+        assert snap["latest_narration_index"] is not None
 
         # events with pagination
         r = await client.get(f"/runs/{run.run_name}/events")

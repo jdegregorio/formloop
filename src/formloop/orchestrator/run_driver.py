@@ -1,8 +1,9 @@
 """Deterministic run driver — the outer orchestration loop.
 
 REQ: FLH-F-001, FLH-F-002, FLH-F-005, FLH-F-008, FLH-F-009, FLH-F-017,
-REQ: FLH-F-018, FLH-F-019, FLH-F-020, FLH-F-022, FLH-F-024,
-REQ: FLH-NF-005, FLH-NF-009, FLH-D-011, FLH-D-012, FLH-D-013
+REQ: FLH-F-018, FLH-F-019, FLH-F-020, FLH-F-022, FLH-F-024, FLH-F-026,
+REQ: FLH-NF-005, FLH-NF-009, FLH-NF-010, FLH-D-011, FLH-D-012, FLH-D-013,
+REQ: FLH-D-025
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ..agents import (
+    NarrationInput,
     PromptContext,
     RunContext,
     Runner,
@@ -40,6 +42,7 @@ from ..schemas import (
 )
 from ..store import RunStore
 from ..store.run_store import CandidateBundle
+from .narrator import Narrator
 
 
 @dataclass
@@ -86,10 +89,12 @@ class RunDriver:
         *,
         store: RunStore | None = None,
         event_hook: Callable[[ProgressEvent], None] | None = None,
+        narrator: Narrator | None = None,
     ) -> None:
         self.config = config
         self.store = store or RunStore(config.runs_dir)
         self._event_hook = event_hook
+        self.narrator = narrator if narrator is not None else Narrator.auto()
 
     # ---- public API ------------------------------------------------------
 
@@ -193,7 +198,15 @@ class RunDriver:
     # ---- phases ----------------------------------------------------------
 
     async def _plan(self, run, prompt: str, profile: Profile) -> ManagerPlan:
-        self._emit(run.run_name, ProgressEventKind.breadcrumb, "planning spec")
+        await self._narrate(
+            run.run_name,
+            phase="plan",
+            just_completed="received the user prompt",
+            next_step="normalize it into a concrete spec",
+            why="we want a structured target before any CAD work starts",
+            signals={},
+            fallback="planning the spec",
+        )
         agent = build_manager_plan(profile)
         result = await Runner.run(
             agent,
@@ -226,6 +239,26 @@ class RunDriver:
                 message=f"assumption: {a.topic}",
                 data={"topic": a.topic, "assumption": a.assumption},
             )
+        await self._narrate(
+            run.run_name,
+            phase="plan",
+            just_completed="normalized the spec",
+            next_step=(
+                "kick off background research"
+                if plan.research_topics
+                else "hand the spec to the CAD designer"
+            ),
+            why=(
+                "we recorded a few assumptions where the prompt was ambiguous"
+                if plan.assumptions
+                else ""
+            ),
+            signals={
+                "assumptions": len(plan.assumptions),
+                "research_topics": len(plan.research_topics),
+            },
+            fallback="spec normalized",
+        )
         return plan
 
     async def _research(self, run, plan: ManagerPlan, profile: Profile) -> list[dict]:
@@ -237,12 +270,26 @@ class RunDriver:
             message=f"researching {len(plan.research_topics)} topics",
             data={"topics": list(plan.research_topics)},
         )
+        await self._narrate(
+            run.run_name,
+            phase="research",
+            just_completed="planned the research topics",
+            next_step=(
+                f"look up {len(plan.research_topics)} topic"
+                f"{'s' if len(plan.research_topics) != 1 else ''} in parallel"
+            ),
+            why="parallel lookups keep the run snappy",
+            signals={"topic_count": len(plan.research_topics)},
+            fallback=f"researching {len(plan.research_topics)} topics",
+        )
         researcher = build_design_researcher(profile)
         tasks = [Runner.run(researcher, input=topic) for topic in plan.research_topics]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         findings: list[dict] = []
+        failures = 0
         for topic, res in zip(plan.research_topics, results, strict=True):
             if isinstance(res, Exception):
+                failures += 1
                 findings.append(
                     {"topic": topic, "summary": f"[research failed: {res}]", "citations": []}
                 )
@@ -253,6 +300,19 @@ class RunDriver:
             ProgressEventKind.research_completed,
             message="research complete",
             data={"count": len(findings)},
+        )
+        await self._narrate(
+            run.run_name,
+            phase="research",
+            just_completed="finished the research lookups",
+            next_step="hand the findings + spec to the CAD designer",
+            why=(
+                f"{failures} of {len(findings)} lookups failed but we have enough to proceed"
+                if failures
+                else ""
+            ),
+            signals={"findings": len(findings), "failures": failures},
+            fallback="research complete",
         )
         return findings
 
@@ -276,6 +336,27 @@ class RunDriver:
                 ProgressEventKind.revision_started,
                 message=f"revision attempt {attempt}",
                 data={"attempt": attempt},
+            )
+            await self._narrate(
+                run.run_name,
+                phase="revision",
+                just_completed=(
+                    "reviewed the prior attempt"
+                    if prior_review is not None
+                    else "got the spec ready"
+                ),
+                next_step=(
+                    f"build revision attempt {attempt}"
+                    if attempt > 1
+                    else "build the first revision"
+                ),
+                why=(
+                    "the reviewer asked us to iterate"
+                    if prior_review is not None
+                    else "we always try at least one design pass"
+                ),
+                signals={"attempt": attempt, "max_attempts": max_revisions},
+                fallback=f"starting revision attempt {attempt}",
             )
             prompt_ctx = PromptContext(
                 input_summary=user_prompt,
@@ -309,6 +390,26 @@ class RunDriver:
                     "render_ok": cad_out.render_ok,
                     "dimensions": cad_out.dimensions,
                 },
+            )
+            await self._narrate(
+                run.run_name,
+                phase="revision",
+                just_completed="ran the CAD designer",
+                next_step=(
+                    "persist the revision and send it to review"
+                    if cad_out.build_ok and cad_out.render_ok
+                    else "retry — the build or render didn't complete cleanly"
+                ),
+                why="",
+                signals={
+                    "attempt": attempt,
+                    "build_ok": cad_out.build_ok,
+                    "render_ok": cad_out.render_ok,
+                    "inspect_ok": cad_out.inspect_ok,
+                },
+                fallback=(
+                    f"designer build_ok={cad_out.build_ok} render_ok={cad_out.render_ok}"
+                ),
             )
 
             if not (
@@ -371,6 +472,15 @@ class RunDriver:
                 message=f"persisted {revision.revision_name}",
                 data={"revision": revision.revision_name, "ordinal": revision.ordinal},
             )
+            await self._narrate(
+                run.run_name,
+                phase="revision",
+                just_completed="saved the candidate artifacts",
+                next_step="hand it to the quality specialist for review",
+                why="",
+                signals={"attempt": attempt, "ordinal": revision.ordinal},
+                fallback="revision saved; reviewing",
+            )
 
             review = await self._review(
                 run=run,
@@ -384,7 +494,20 @@ class RunDriver:
                 self._emit(
                     run.run_name,
                     ProgressEventKind.breadcrumb,
-                    message=f"{revision.revision_name} accepted",
+                    message="revision accepted",
+                )
+                await self._narrate(
+                    run.run_name,
+                    phase="revision",
+                    just_completed="accepted the revision",
+                    next_step="synthesize the final answer for the user",
+                    why=(
+                        "the reviewer is confident in this design"
+                        if review.confidence and review.confidence >= 0.7
+                        else "the reviewer is comfortable handing this off"
+                    ),
+                    signals={"confidence": review.confidence},
+                    fallback="revision accepted",
                 )
                 break
             prior_review = review.model_dump()
@@ -405,6 +528,15 @@ class RunDriver:
             run.run_name,
             ProgressEventKind.review_started,
             message=f"reviewing {revision.revision_name}",
+        )
+        await self._narrate(
+            run.run_name,
+            phase="review",
+            just_completed="finished the build and render",
+            next_step="check the result against the spec",
+            why="",
+            signals={},
+            fallback="reviewing the revision",
         )
         reviewer = build_quality_specialist_review(profile)
         payload = {
@@ -435,6 +567,26 @@ class RunDriver:
                 "confidence": review.confidence,
             },
         )
+        await self._narrate(
+            run.run_name,
+            phase="review",
+            just_completed="reviewed the revision",
+            next_step=(
+                "deliver this design"
+                if review.decision == ReviewDecision.pass_
+                else "iterate based on the review feedback"
+            ),
+            why=(
+                review.key_findings[0]
+                if review.key_findings
+                else ""
+            ),
+            signals={
+                "decision": review.decision.value,
+                "confidence": review.confidence,
+            },
+            fallback=f"review decision: {review.decision.value}",
+        )
         return review
 
     async def _finalize(
@@ -444,7 +596,19 @@ class RunDriver:
         delivered_rev_name: str | None,
         profile: Profile,
     ) -> ManagerFinalAnswer:
-        self._emit(run.run_name, ProgressEventKind.breadcrumb, "synthesizing final answer")
+        await self._narrate(
+            run.run_name,
+            phase="final",
+            just_completed=(
+                "settled on a design"
+                if delivered_rev_name
+                else "exhausted our revision attempts"
+            ),
+            next_step="write up what we delivered for the user",
+            why="",
+            signals={"delivered": bool(delivered_rev_name)},
+            fallback="synthesizing the final answer",
+        )
         fresh = self.store.load_run(run.run_name)
         snap = self.store.load_snapshot(run.run_name)
         payload = {
@@ -475,14 +639,61 @@ class RunDriver:
         message: str,
         *,
         data: dict | None = None,
+        phase: str | None = None,
+        narration_error: str | None = None,
     ) -> None:
-        event = ProgressEvent(index=0, kind=kind, message=message, data=data or {})
+        event = ProgressEvent(
+            index=0,
+            kind=kind,
+            message=message,
+            phase=phase,
+            narration_error=narration_error,
+            data=data or {},
+        )
         written = self.store.append_event(run_name, event)
         if self._event_hook is not None:
             try:
                 self._event_hook(written)
             except Exception:
                 pass
+
+    async def _narrate(
+        self,
+        run_name: str,
+        *,
+        phase: str,
+        just_completed: str,
+        next_step: str,
+        why: str,
+        signals: dict[str, Any],
+        fallback: str,
+    ) -> None:
+        """Generate and emit a narration event.
+
+        REQ: FLH-F-024, FLH-F-026, FLH-NF-010 — never aborts the run; on
+        Narrator failure the static ``fallback`` is emitted with the error
+        recorded in ``narration_error``.
+        """
+
+        payload = NarrationInput(
+            phase=phase,
+            just_completed=just_completed,
+            next_step=next_step,
+            why=why,
+            signals=dict(signals),
+        )
+        try:
+            text, err = await self.narrator.narrate(payload, fallback=fallback)
+        except Exception as exc:  # noqa: BLE001 -- belt-and-suspenders
+            text, err = fallback, f"{type(exc).__name__}: {exc}"[:200]
+        self._emit(
+            run_name,
+            ProgressEventKind.narration,
+            text,
+            data={"phase": phase, "signals": dict(signals)},
+            phase=phase,
+            narration_error=err,
+        )
 
 
 async def drive_run(
@@ -493,8 +704,9 @@ async def drive_run(
     reference_image: str | None = None,
     max_revisions: int | None = None,
     event_hook: Callable[[ProgressEvent], None] | None = None,
+    narrator: Narrator | None = None,
 ) -> dict[str, Any]:
-    driver = RunDriver(config, event_hook=event_hook)
+    driver = RunDriver(config, event_hook=event_hook, narrator=narrator)
     return await driver.run(
         DriveRequest(
             prompt=prompt,
