@@ -1,6 +1,6 @@
 """Typer-based operator CLI.
 
-REQ: FLH-F-012, FLH-F-013, FLH-D-015, FLH-D-016, FLH-V-007
+REQ: FLH-F-012, FLH-F-013, FLH-F-027, FLH-D-015, FLH-D-016, FLH-V-007
 """
 
 from __future__ import annotations
@@ -24,6 +24,8 @@ from ..config.env import load_env_local, repo_root
 from ..config.profiles import HarnessConfig, load_config
 from ..orchestrator import drive_run
 from ..runtime.cad_cli import locate_blender, locate_cad
+from .run_renderer import make_renderer
+from .run_report import print_run_footer, print_run_header
 
 
 app = typer.Typer(
@@ -66,14 +68,51 @@ def run_cmd(
         int | None,
         typer.Option("--max-revisions", help="Override max revision attempts."),
     ] = None,
+    quiet: Annotated[
+        bool,
+        typer.Option(
+            "--quiet",
+            "-q",
+            help="Suppress live narration; only show the final result.",
+        ),
+    ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Show every event with its data payload (debugging).",
+        ),
+    ] = False,
+    no_color: Annotated[
+        bool,
+        typer.Option(
+            "--no-color", help="Disable ANSI colors / in-place narration rewrite."
+        ),
+    ] = False,
 ) -> None:
-    """Run the harness end-to-end for a single prompt (FLH-F-012)."""
+    """Run the harness end-to-end for a single prompt (FLH-F-012, FLH-F-027).
+
+    Live narration mirrors the UI's reasoning-trace pattern: the latest
+    LLM-written status update is rewritten in place between scrolling
+    history. Use ``--verbose`` for the full event stream, ``--quiet`` to
+    suppress narration entirely.
+    """
 
     config = _resolve_config()
     ref = str(reference_image.resolve()) if reference_image else None
+    resolved_profile = config.profile(profile)
 
-    def _print_event(ev) -> None:
-        typer.echo(f"[{ev.index:03d}] {ev.kind.value}: {ev.message}")
+    renderer = make_renderer(quiet=quiet, verbose=verbose, color=not no_color)
+
+    if not quiet:
+        print_run_header(
+            prompt=prompt,
+            profile_name=resolved_profile.name,
+            model=resolved_profile.model,
+            reference_image=ref,
+            color=not no_color,
+        )
 
     result = asyncio.run(
         drive_run(
@@ -82,21 +121,24 @@ def run_cmd(
             profile=profile,
             reference_image=ref,
             max_revisions=max_revisions,
-            event_hook=_print_event,
+            event_hook=renderer,
         )
     )
+    renderer.finalize()
 
-    typer.echo("")
-    typer.echo(f"Run: {result['run_name']}  status={result['status']}")
-    if result.get("delivered_revision"):
-        rev = result["delivered_revision"]
-        rev_dir = config.runs_dir / result["run_name"] / "revisions" / rev
-        typer.echo(f"Delivered revision: {rev}")
-        typer.echo(f"Artifacts:          {rev_dir}")
-    if result.get("final_answer"):
-        typer.echo("")
-        typer.echo("Final answer:")
-        typer.echo(result["final_answer"])
+    if not quiet:
+        print_run_footer(
+            run_name=result["run_name"],
+            status=result["status"],
+            delivered_revision=result.get("delivered_revision"),
+            artifacts_dir=(
+                config.runs_dir / result["run_name"] / "revisions" / result["delivered_revision"]
+                if result.get("delivered_revision")
+                else None
+            ),
+            final_answer=result.get("final_answer"),
+            color=not no_color,
+        )
 
     if result["status"] != "succeeded":
         raise typer.Exit(code=2)

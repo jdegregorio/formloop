@@ -17,6 +17,12 @@ from .manager import (
     build_manager_final,
     build_manager_plan,
 )
+from .narrator import (
+    DEFAULT_NARRATOR_PROFILE,
+    NarrationInput,
+    NarrationOutput,
+    build_narrator,
+)
 from .quality_specialist import (
     build_quality_specialist_judge,
     build_quality_specialist_review,
@@ -25,8 +31,11 @@ from .quality_specialist import (
 __all__ = [
     "AssumptionProposal",
     "CadRevisionResult",
+    "DEFAULT_NARRATOR_PROFILE",
     "ManagerFinalAnswer",
     "ManagerPlan",
+    "NarrationInput",
+    "NarrationOutput",
     "PromptContext",
     "ResearchCitation",
     "ResearchFinding",
@@ -36,6 +45,7 @@ __all__ = [
     "build_design_researcher",
     "build_manager_final",
     "build_manager_plan",
+    "build_narrator",
     "build_quality_specialist_judge",
     "build_quality_specialist_review",
 ]

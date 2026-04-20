@@ -39,3 +39,10 @@ class RunSnapshot(SchemaModel):
     last_event_index: int = Field(default=-1, ge=-1)
     last_event_kind: str | None = None
     last_message: str | None = None
+
+    # Latest LLM-written progress narration — what the UI / CLI surfaces as
+    # the live "reasoning trace" line under the latest user message
+    # (FLH-F-024, FLH-F-026).
+    latest_narration: str | None = None
+    latest_narration_phase: str | None = None
+    latest_narration_index: int | None = Field(default=None, ge=0)

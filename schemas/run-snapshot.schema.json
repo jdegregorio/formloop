@@ -124,6 +124,43 @@
       "default": null,
       "title": "Last Message"
     },
+    "latest_narration": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latest Narration"
+    },
+    "latest_narration_index": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latest Narration Index"
+    },
+    "latest_narration_phase": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latest Narration Phase"
+    },
     "latest_review_decision": {
       "anyOf": [
         {

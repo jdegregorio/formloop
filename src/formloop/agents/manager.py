@@ -80,13 +80,28 @@ Inputs you receive in the user message:
 - A summary of each revision attempted and the final review decision.
 - The delivered revision's dimensions and any remaining risks.
 
-Produce a ``ManagerFinalAnswer`` whose ``text``:
-- Opens with a one-sentence direct answer to the user's original request.
+Produce a ``ManagerFinalAnswer`` whose ``text`` reads as a clean, user-facing
+summary written in plain prose. Required structure:
+- Opens with a one-sentence direct answer to the user's original request,
+  written naturally — confirm what was delivered, not how the harness
+  bookkeeps it.
 - Lists the delivered dimensions in a compact way.
 - Calls out any known risks or remaining uncertainties plainly.
-- Mentions the revision count and where the artifacts live (by logical name, not
-  full path).
-Set ``delivered_revision_name`` to the rev-NNN label that was delivered."""
+- May briefly mention how many revision attempts were made if it adds
+  meaningful context (e.g. "after one pass" or "after two iterations").
+
+Strict rules for ``text``:
+- DO NOT include the rev-NNN identifier, the run name, filesystem paths, or
+  any other internal harness bookkeeping. The CLI / UI surfaces those
+  separately. The reader of ``text`` should not need to know how revisions
+  are named internally.
+- Write in natural prose. Section labels and bullet lists are fine when
+  they help scan dimensions or risks (e.g. "Delivered dimensions:" with a
+  short bullet list), but keep the framing crisp and avoid restating things
+  the surrounding UI already shows.
+
+Set ``delivered_revision_name`` to the rev-NNN label that was delivered —
+this is for the harness, not the user."""
 
 
 def build_manager_plan(profile: Profile) -> Agent[None]:

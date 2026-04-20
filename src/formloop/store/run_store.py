@@ -352,8 +352,43 @@ class RunStore:
             snap.last_event_kind = last_event.kind.value
             snap.last_message = last_event.message
 
+        # Surface the most recent narration event so polling clients
+        # (UI + CLI) can show the live reasoning-trace line without having
+        # to rescan the events file themselves.
+        latest_narration = self._find_latest_narration(layout, last_event)
+        if latest_narration is not None:
+            snap.latest_narration = latest_narration.message
+            snap.latest_narration_phase = latest_narration.phase
+            snap.latest_narration_index = latest_narration.index
+
         _atomic_write_text(layout.snapshot_json, snap.model_dump_json(indent=2))
         return snap
+
+    def _find_latest_narration(
+        self, layout: RunLayout, last_event: ProgressEvent | None
+    ) -> ProgressEvent | None:
+        """Return the most recent narration event, or ``None``."""
+
+        if (
+            last_event is not None
+            and last_event.kind is ProgressEventKind.narration
+        ):
+            return last_event
+        if not layout.events_jsonl.is_file():
+            return None
+        latest: ProgressEvent | None = None
+        with layout.events_jsonl.open() as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or '"narration"' not in line:
+                    continue
+                try:
+                    ev = ProgressEvent.model_validate_json(line)
+                except Exception:
+                    continue
+                if ev.kind is ProgressEventKind.narration:
+                    latest = ev
+        return latest
 
     def load_snapshot(self, run_name: str) -> RunSnapshot:
         layout = self.layout(run_name)

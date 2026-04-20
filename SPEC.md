@@ -151,7 +151,12 @@ At a high level, the UI should present a design-review workspace built around:
 - artifact downloads
 - collapsed-by-default traceability surfaces
 
-The UI should consume a polling-friendly HTTP interface from the harness. Progress should be surfaced as structured events and LLM-generated milestone breadcrumbs rather than requiring a streaming-only transport.
+The UI should consume a polling-friendly HTTP interface from the harness. Progress is surfaced through two complementary channels on the same append-only event stream:
+
+- **Structured milestone events** — machine-readable markers (`spec_normalized`, `revision_built`, `review_completed`, `delivered`, …) used for state transitions and analytics.
+- **Narration events** (`kind == "narration"`) — short conversational status updates written by a dedicated lightweight Narrator agent (FLH-F-026). Each narration carries a coarse `phase` tag (`plan` / `research` / `revision` / `review` / `final` / `failure`) and answers what just finished, what's starting next, and why when it's informative. The latest narration is also surfaced as `latest_narration` on the run snapshot so polling clients don't need to scan the event tail.
+
+The UI renders the latest narration as a de-emphasized line between the operator's last message and the agent's eventual final answer — like a reasoning-trace component. As new narrations arrive, the previous one collapses into history; the operator can expand a "show trace" affordance to see the full sequence. The `formloop run` CLI mirrors this behavior in the terminal: latest narration in place above the next final block, structured milestones dimmed, with `--quiet` and `--verbose` flags to control verbosity (FLH-F-027).
 
 ### CLI Responsibilities
 
