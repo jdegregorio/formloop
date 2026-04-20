@@ -3,24 +3,21 @@
 REQ: FLH-F-024, FLH-F-026, FLH-F-027
 
 The orchestrator streams every ``ProgressEvent`` through ``event_hook``. This
-module turns those events into a TTY-friendly live status feed that mirrors
-the UI's reasoning-trace pattern: the latest LLM-written narration sits
-prominently between the user prompt and the (eventual) final answer, with
-older narrations / structured milestones rendered dimmer above.
+module turns those events into a TTY-friendly live status feed.
 
-Three modes:
+Design notes:
 
-* ``rich`` (default for TTY): narrations are rewritten in place using ANSI
-  cursor controls so the latest one always occupies the same screen line;
-  older narrations scroll above as faint history. Structured milestone
-  events get a single dimmed line.
-* ``plain`` (auto when stdout isn't a TTY, ``NO_COLOR`` is set, or the user
-  passed ``--no-color``): one line per event, no ANSI, no in-place rewrite.
-* ``verbose``: like plain, but also prints the structured ``data`` payload —
-  useful for debugging.
-
-The ``quiet`` flag suppresses narrations and milestone dimmed lines entirely;
-only the final summary block printed by the CLI itself remains.
+* The terminal is append-only — unlike the UI, there's no "expand history"
+  affordance, so every narration must remain visible. Long narrations are
+  word-wrapped with a hanging indent rather than truncated. The screen never
+  rewrites prior lines.
+* Structured milestone events are dimmed and prefixed with ``·`` so they
+  read as supporting context next to the bolder narration lines.
+* ``--quiet`` suppresses everything except failures (which always escape).
+* ``--verbose`` prints each event with its raw ``data`` payload — useful for
+  debugging the orchestrator.
+* When stdout isn't a TTY (or ``NO_COLOR`` is set, or ``--no-color`` was
+  passed) we strip ANSI but keep the same line layout.
 """
 
 from __future__ import annotations
@@ -28,6 +25,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
+import textwrap
 from dataclasses import dataclass
 from enum import Enum
 from typing import IO
@@ -36,9 +34,9 @@ from ..schemas import ProgressEvent, ProgressEventKind
 
 
 class RendererMode(str, Enum):
-    rich = "rich"
-    plain = "plain"
-    verbose = "verbose"
+    rich = "rich"  # color + pretty layout (TTY default)
+    plain = "plain"  # same layout, no ANSI
+    verbose = "verbose"  # plain layout + raw data payloads
 
 
 # Structured events that are interesting enough to surface (dimmed) even
@@ -46,6 +44,7 @@ class RendererMode(str, Enum):
 _DEFAULT_VISIBLE_KINDS: frozenset[ProgressEventKind] = frozenset(
     {
         ProgressEventKind.spec_normalized,
+        ProgressEventKind.assumption_recorded,
         ProgressEventKind.research_started,
         ProgressEventKind.research_completed,
         ProgressEventKind.revision_started,
@@ -63,10 +62,14 @@ _RESET = "\x1b[0m"
 _DIM = "\x1b[2m"
 _BOLD = "\x1b[1m"
 _RED = "\x1b[31m"
-_BLUE = "\x1b[34m"
-_CLEAR_LINE = "\x1b[2K"
-_CURSOR_UP = "\x1b[1A"
-_CURSOR_TO_COL_0 = "\r"
+_GREEN = "\x1b[32m"
+_YELLOW = "\x1b[33m"
+_CYAN = "\x1b[36m"
+
+NARRATION_MARKER = "›"
+MILESTONE_MARKER = "·"
+ASSUMPTION_MARKER = "↳"
+FAILURE_MARKER = "✗"
 
 
 def _supports_ansi(stream: IO[str]) -> bool:
@@ -87,10 +90,31 @@ def _terminal_width(default: int = 100) -> int:
         return default
 
 
-def _truncate(text: str, width: int) -> str:
-    if width <= 1 or len(text) <= width:
-        return text
-    return text[: max(1, width - 1)] + "…"
+def _wrap(text: str, *, width: int, initial_indent: str, subsequent_indent: str) -> str:
+    """Word-wrap ``text`` to ``width`` with the given indents.
+
+    Falls back to a single line when the input is short. Preserves explicit
+    paragraph breaks (``\\n``) by wrapping each chunk independently.
+    """
+
+    if not text:
+        return initial_indent.rstrip()
+    chunks = text.splitlines() or [text]
+    out_lines: list[str] = []
+    for i, chunk in enumerate(chunks):
+        chunk = chunk.strip()
+        if not chunk:
+            out_lines.append("")
+            continue
+        wrapper = textwrap.TextWrapper(
+            width=max(20, width),
+            initial_indent=initial_indent if i == 0 else subsequent_indent,
+            subsequent_indent=subsequent_indent,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        out_lines.append(wrapper.fill(chunk))
+    return "\n".join(out_lines)
 
 
 @dataclass
@@ -111,12 +135,14 @@ class EventRenderer:
     ) -> None:
         self.stream = stream if stream is not None else sys.stdout
         self.options = options or RendererOptions()
-        # Decide effective mode.
+        # Decide effective mode — rich requires both a TTY and color enabled.
         if not _supports_ansi(self.stream) or not self.options.color:
             if self.options.mode is RendererMode.rich:
                 self.options.mode = RendererMode.plain
-        self._latest_narration_on_screen = False  # rich mode bookkeeping
-        self._last_narration_phase: str | None = None
+        self._last_phase: str | None = None
+        # Track whether anything has been printed yet, so we can pad blocks
+        # nicely without leading blank lines.
+        self._printed_any = False
 
     # ---- public --------------------------------------------------------
 
@@ -130,22 +156,27 @@ class EventRenderer:
             pass
 
     def finalize(self) -> None:
-        """Call once when the run finishes so we leave a clean cursor."""
+        """Call once when the run finishes. No cursor cleanup needed in
+        append-only mode, but kept on the public API for callers."""
 
-        if self._latest_narration_on_screen:
-            # Move past the in-place narration line so the final summary
-            # block prints below cleanly.
-            self.stream.write("\n")
-            self._latest_narration_on_screen = False
-            self.stream.flush()
+        return None
 
     # ---- internals -----------------------------------------------------
 
+    def _color(self, ansi: str, text: str) -> str:
+        if self.options.color and self.options.mode is RendererMode.rich:
+            return f"{ansi}{text}{_RESET}"
+        return text
+
+    def _print(self, line: str) -> None:
+        self.stream.write(line.rstrip("\n") + "\n")
+        self.stream.flush()
+        self._printed_any = True
+
     def _render(self, event: ProgressEvent) -> None:
         if self.options.quiet:
-            # Quiet mode: only failures escape.
             if event.kind is ProgressEventKind.run_failed:
-                self._write_failure(event)
+                self._render_failure(event)
             return
 
         if event.kind is ProgressEventKind.narration:
@@ -153,7 +184,7 @@ class EventRenderer:
             return
 
         if event.kind is ProgressEventKind.run_failed:
-            self._write_failure(event)
+            self._render_failure(event)
             return
 
         if self.options.mode is RendererMode.verbose:
@@ -161,100 +192,220 @@ class EventRenderer:
             return
 
         if event.kind in _DEFAULT_VISIBLE_KINDS:
-            self._render_milestone_dimmed(event)
+            self._render_milestone(event)
+
+    # ---- narration -----------------------------------------------------
 
     def _render_narration(self, event: ProgressEvent) -> None:
         text = (event.message or "").strip()
         if not text:
             return
         width = _terminal_width()
-        prefix = "› "
-        line = _truncate(prefix + text, width)
-        if self.options.mode is RendererMode.rich:
-            # In rich mode we rewrite the previous narration line in place
-            # so the latest narration always occupies the same row, like
-            # the UI's reasoning-trace component. Previous narrations are
-            # promoted to dimmed history lines.
-            if self._latest_narration_on_screen:
-                # Move up over the live line, clear it, then write the
-                # previous text as a dimmed history line in its place
-                # before emitting the new live line below.
-                self.stream.write(_CURSOR_UP + _CURSOR_TO_COL_0 + _CLEAR_LINE)
-                # Promote the just-replaced narration to dimmed history.
-                # We can't recover the old text from the screen, so we
-                # just emit a faint marker — the full trace lives in the
-                # events file anyway.
-                self.stream.write(_DIM + "  ·\n" + _RESET)
-            self.stream.write(_BOLD + line + _RESET + "\n")
-            self._latest_narration_on_screen = True
-        else:
-            # Plain / verbose: lead with the narration marker so the line
-            # is visually distinct from milestone lines, with the phase
-            # tag trailing in brackets for context.
-            phase_suffix = f"  [{event.phase}]" if event.phase else ""
-            full = line + phase_suffix
-            full = _truncate(full, width)
-            self.stream.write(full + "\n")
-            if event.narration_error:
-                self.stream.write(
-                    f"  (narrator fallback: {event.narration_error})\n"
-                )
-        self._last_narration_phase = event.phase
-        self.stream.flush()
+        phase = event.phase or "…"
+        # First-line prefix shows phase + marker so readers can scan the
+        # left margin to follow the run's progression. Continuation lines
+        # indent under the text so the wrap reads as one paragraph.
+        phase_tag = f"[{phase}]"
+        initial = f"  {NARRATION_MARKER} {self._color(_DIM, phase_tag)} "
+        # Visible width of the colored phase tag is its character length —
+        # ANSI escapes are zero-width, so we measure on the raw tag.
+        visible_prefix_len = len(f"  {NARRATION_MARKER} {phase_tag} ")
+        subsequent = " " * visible_prefix_len
+        body = _wrap(text, width=width, initial_indent="", subsequent_indent="")
+        # Wrap manually so the colored prefix isn't counted into the width.
+        wrapped = textwrap.fill(
+            body,
+            width=max(20, width),
+            initial_indent="",
+            subsequent_indent=subsequent,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        # Insert prefix before the first line.
+        first, _, rest = wrapped.partition("\n")
+        line = self._color(_BOLD, initial + first)
+        if rest:
+            line = line + "\n" + rest
+        self._print(line)
+        if event.narration_error:
+            self._print(
+                self._color(_DIM, f"    (narrator fallback: {event.narration_error})")
+            )
+        self._last_phase = event.phase
 
-    def _render_milestone_dimmed(self, event: ProgressEvent) -> None:
-        # In rich mode, milestones print *above* the in-place narration,
-        # so we have to scroll the narration down by one line to keep the
-        # ordering right. Easiest path: clear the live line, write the
-        # milestone, then re-emit the live narration placeholder.
-        text = self._milestone_text(event)
+    # ---- milestones ----------------------------------------------------
+
+    def _render_milestone(self, event: ProgressEvent) -> None:
+        """Render a structured milestone event with kind-specific polish."""
+
+        kind = event.kind
         width = _terminal_width()
-        line = _truncate("  · " + text, width)
-        if (
-            self.options.mode is RendererMode.rich
-            and self._latest_narration_on_screen
-        ):
-            self.stream.write(_CURSOR_UP + _CURSOR_TO_COL_0 + _CLEAR_LINE)
-            self.stream.write(_DIM + line + _RESET + "\n")
-            # Live narration is no longer on screen — finalize() / next
-            # narration will redraw it. We mark it absent so the next
-            # narration prints fresh.
-            self._latest_narration_on_screen = False
+
+        if kind is ProgressEventKind.spec_normalized:
+            self._render_spec_normalized(event, width=width)
+            return
+        if kind is ProgressEventKind.assumption_recorded:
+            self._render_assumption(event, width=width)
+            return
+        if kind is ProgressEventKind.research_started:
+            topics = event.data.get("topics") or []
+            count = len(topics) if isinstance(topics, list) else event.data.get(
+                "count", 0
+            )
+            text = f"researching {count} topic{'s' if count != 1 else ''}"
+            self._render_milestone_line(text, width=width)
+            if isinstance(topics, list) and topics:
+                for t in topics[:6]:
+                    self._render_indent_line(f"- {t}", width=width)
+            return
+        if kind is ProgressEventKind.research_completed:
+            count = event.data.get("count", 0)
+            self._render_milestone_line(
+                f"research complete ({count} finding{'s' if count != 1 else ''})",
+                width=width,
+            )
+            return
+        if kind is ProgressEventKind.revision_started:
+            attempt = event.data.get("attempt")
+            label = (
+                f"revision attempt {attempt}" if attempt else (event.message or "revision")
+            )
+            self._render_milestone_line(label, width=width)
+            return
+        if kind is ProgressEventKind.revision_built:
+            data = event.data
+            parts = []
+            if "build_ok" in data:
+                parts.append(f"build={'ok' if data['build_ok'] else 'FAIL'}")
+            if "render_ok" in data:
+                parts.append(f"render={'ok' if data['render_ok'] else 'FAIL'}")
+            if "inspect_ok" in data:
+                parts.append(f"inspect={'ok' if data['inspect_ok'] else 'FAIL'}")
+            text = "designer returned " + " ".join(parts) if parts else (
+                event.message or "designer returned"
+            )
+            self._render_milestone_line(text, width=width)
+            dims = data.get("dimensions")
+            if isinstance(dims, dict) and dims:
+                summary = ", ".join(
+                    f"{k}={v}" for k, v in list(dims.items())[:6]
+                )
+                self._render_indent_line(summary, width=width)
+            return
+        if kind is ProgressEventKind.revision_persisted:
+            rev = event.data.get("revision") or event.message
+            self._render_milestone_line(f"persisted {rev}", width=width)
+            return
+        if kind is ProgressEventKind.review_started:
+            rev = event.data.get("revision")
+            text = f"reviewing {rev}" if rev else (event.message or "reviewing")
+            self._render_milestone_line(text, width=width)
+            return
+        if kind is ProgressEventKind.review_completed:
+            decision = event.data.get("decision") or "?"
+            confidence = event.data.get("confidence")
+            text = f"review decision: {decision}"
+            if isinstance(confidence, (int, float)):
+                text += f" (confidence {confidence:.2f})"
+            decorated = (
+                self._color(_GREEN, text)
+                if decision == "pass"
+                else self._color(_YELLOW, text)
+            )
+            # Render manually so we keep the milestone marker but use a
+            # decision-colored body instead of the default dim treatment.
+            self._print(f"  {self._color(_DIM, MILESTONE_MARKER)} {decorated}")
+            return
+        if kind is ProgressEventKind.delivered:
+            rev = event.data.get("revision")
+            status = event.data.get("status")
+            text = "delivered"
+            if rev:
+                text += f" {rev}"
+            if status:
+                text += f" ({status})"
+            decorated = (
+                self._color(_GREEN, text)
+                if status == "succeeded"
+                else self._color(_YELLOW, text)
+            )
+            self._print(f"  {self._color(_DIM, MILESTONE_MARKER)} {decorated}")
+            return
+
+        # Fallback: just print the message dimly.
+        self._render_milestone_line(event.message or kind.value.replace("_", " "), width=width)
+
+    def _render_milestone_line(self, text: str, *, width: int) -> None:
+        prefix = f"  {MILESTONE_MARKER} "
+        body = _wrap(
+            text,
+            width=width,
+            initial_indent="",
+            subsequent_indent=" " * len(prefix),
+        )
+        first, _, rest = body.partition("\n")
+        line = self._color(_DIM, prefix + first)
+        if rest:
+            line += "\n" + self._color(_DIM, rest)
+        self._print(line)
+
+    def _render_indent_line(self, text: str, *, width: int) -> None:
+        prefix = "      "  # under the milestone marker
+        wrapped = _wrap(
+            text, width=width, initial_indent=prefix, subsequent_indent=prefix + "  "
+        )
+        self._print(self._color(_DIM, wrapped))
+
+    def _render_spec_normalized(self, event: ProgressEvent, *, width: int) -> None:
+        data = event.data
+        brief = data.get("design_brief") or ""
+        kind_label = data.get("spec_kind") or ""
+        assumption_count = data.get("assumption_count")
+        research_count = data.get("research_topic_count")
+        head = "spec normalized"
+        if kind_label:
+            head += f" — {kind_label}"
+        meta_bits = []
+        if isinstance(assumption_count, int) and assumption_count:
+            meta_bits.append(
+                f"{assumption_count} assumption{'s' if assumption_count != 1 else ''}"
+            )
+        if isinstance(research_count, int) and research_count:
+            meta_bits.append(
+                f"{research_count} research topic{'s' if research_count != 1 else ''}"
+            )
+        if meta_bits:
+            head += " (" + ", ".join(meta_bits) + ")"
+        self._render_milestone_line(head, width=width)
+        if brief:
+            self._render_indent_line(brief, width=width)
+
+    def _render_assumption(self, event: ProgressEvent, *, width: int) -> None:
+        topic = event.data.get("topic") or ""
+        assumption = event.data.get("assumption") or event.message or ""
+        text = f"{ASSUMPTION_MARKER} {topic}: {assumption}" if topic else assumption
+        prefix = "      "
+        wrapped = _wrap(
+            text, width=width, initial_indent=prefix, subsequent_indent=prefix + "  "
+        )
+        self._print(self._color(_DIM, wrapped))
+
+    # ---- failure / verbose ---------------------------------------------
+
+    def _render_failure(self, event: ProgressEvent) -> None:
+        text = f"{FAILURE_MARKER} {event.message or 'run failed'}"
+        if self.options.color and self.options.mode is RendererMode.rich:
+            self._print(_BOLD + _RED + text + _RESET)
         else:
-            if self.options.mode is RendererMode.rich:
-                self.stream.write(_DIM + line + _RESET + "\n")
-            else:
-                self.stream.write(line + "\n")
-        self.stream.flush()
+            self._print(text)
 
     def _render_milestone_verbose(self, event: ProgressEvent) -> None:
-        line = (
-            f"[{event.index:03d}] {event.kind.value}: {event.message}"
-        )
-        self.stream.write(line + "\n")
+        line = f"[{event.index:03d}] {event.kind.value}: {event.message}"
+        self._print(line)
         if event.data:
             import json
 
-            self.stream.write("  data: " + json.dumps(event.data, default=str) + "\n")
-        self.stream.flush()
-
-    def _milestone_text(self, event: ProgressEvent) -> str:
-        # Prefer the structured message; fall back to the kind name.
-        return event.message or event.kind.value.replace("_", " ")
-
-    def _write_failure(self, event: ProgressEvent) -> None:
-        if (
-            self.options.mode is RendererMode.rich
-            and self._latest_narration_on_screen
-        ):
-            self.stream.write(_CURSOR_UP + _CURSOR_TO_COL_0 + _CLEAR_LINE)
-            self._latest_narration_on_screen = False
-        text = f"✗ {event.message or 'run failed'}"
-        if self.options.color and self.options.mode is RendererMode.rich:
-            self.stream.write(_BOLD + _RED + text + _RESET + "\n")
-        else:
-            self.stream.write(text + "\n")
-        self.stream.flush()
+            self._print("  data: " + json.dumps(event.data, default=str))
 
 
 def make_renderer(
@@ -284,4 +435,6 @@ __all__ = [
     "RendererMode",
     "RendererOptions",
     "make_renderer",
+    "NARRATION_MARKER",
+    "MILESTONE_MARKER",
 ]

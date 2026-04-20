@@ -25,6 +25,7 @@ from ..config.profiles import HarnessConfig, load_config
 from ..orchestrator import drive_run
 from ..runtime.cad_cli import locate_blender, locate_cad
 from .run_renderer import make_renderer
+from .run_report import print_run_footer, print_run_header
 
 
 app = typer.Typer(
@@ -100,8 +101,18 @@ def run_cmd(
 
     config = _resolve_config()
     ref = str(reference_image.resolve()) if reference_image else None
+    resolved_profile = config.profile(profile)
 
     renderer = make_renderer(quiet=quiet, verbose=verbose, color=not no_color)
+
+    if not quiet:
+        print_run_header(
+            prompt=prompt,
+            profile_name=resolved_profile.name,
+            model=resolved_profile.model,
+            reference_image=ref,
+            color=not no_color,
+        )
 
     result = asyncio.run(
         drive_run(
@@ -115,17 +126,19 @@ def run_cmd(
     )
     renderer.finalize()
 
-    typer.echo("")
-    typer.echo(f"Run: {result['run_name']}  status={result['status']}")
-    if result.get("delivered_revision"):
-        rev = result["delivered_revision"]
-        rev_dir = config.runs_dir / result["run_name"] / "revisions" / rev
-        typer.echo(f"Delivered revision: {rev}")
-        typer.echo(f"Artifacts:          {rev_dir}")
-    if result.get("final_answer"):
-        typer.echo("")
-        typer.echo("Final answer:")
-        typer.echo(result["final_answer"])
+    if not quiet:
+        print_run_footer(
+            run_name=result["run_name"],
+            status=result["status"],
+            delivered_revision=result.get("delivered_revision"),
+            artifacts_dir=(
+                config.runs_dir / result["run_name"] / "revisions" / result["delivered_revision"]
+                if result.get("delivered_revision")
+                else None
+            ),
+            final_answer=result.get("final_answer"),
+            color=not no_color,
+        )
 
     if result["status"] != "succeeded":
         raise typer.Exit(code=2)

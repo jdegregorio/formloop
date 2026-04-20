@@ -104,24 +104,25 @@ def test_default_filters_low_signal_events() -> None:
     assert buf.getvalue() == ""
 
 
-def test_truncation_respects_terminal_width(monkeypatch) -> None:
+def test_long_narration_wraps_to_terminal_width(monkeypatch) -> None:
+    # Append-only mode must NEVER truncate narrations — terminals can't
+    # expand history like the UI can, so the full text has to wrap.
     monkeypatch.setattr(
-        "formloop.cli.run_renderer._terminal_width", lambda default=100: 30
+        "formloop.cli.run_renderer._terminal_width", lambda default=100: 40
     )
     r, buf = _renderer()
-    r(
-        _ev(
-            1,
-            ProgressEventKind.narration,
-            "this is a very long narration line that should be truncated cleanly",
-            phase="plan",
-        )
-    )
-    out = buf.getvalue().rstrip("\n").splitlines()[-1]
-    # Truncation appends an ellipsis and keeps the line within the
-    # configured terminal width.
-    assert out.endswith("…")
-    assert len(out) <= 30
+    text = "this is a very long narration line that should wrap cleanly across multiple terminal rows"
+    r(_ev(1, ProgressEventKind.narration, text, phase="plan"))
+    lines = buf.getvalue().rstrip("\n").splitlines()
+    # The full text must be reconstructable from the wrapped lines.
+    joined = " ".join(line.strip() for line in lines)
+    assert text in joined
+    # No line should be wildly longer than the configured width — wrapping
+    # is best-effort but should keep individual lines bounded.
+    assert all(len(line) <= 60 for line in lines), lines
+    # And we should produce more than one line for a clearly oversized
+    # narration.
+    assert len(lines) >= 2
 
 
 def test_make_renderer_auto_downgrades_when_no_tty() -> None:

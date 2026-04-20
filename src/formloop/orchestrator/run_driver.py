@@ -223,6 +223,11 @@ class RunDriver:
             for a in plan.assumptions
         ]
         self.store.save_run(fresh)
+        spec_kind = None
+        if isinstance(plan.normalized_spec, dict):
+            spec_kind = plan.normalized_spec.get("kind") or plan.normalized_spec.get(
+                "type"
+            )
         self._emit(
             run.run_name,
             ProgressEventKind.spec_normalized,
@@ -230,6 +235,8 @@ class RunDriver:
             data={
                 "assumption_count": len(plan.assumptions),
                 "research_topic_count": len(plan.research_topics),
+                "design_brief": plan.design_brief,
+                "spec_kind": spec_kind,
             },
         )
         for a in plan.assumptions:
