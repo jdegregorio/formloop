@@ -241,30 +241,37 @@ class EventRenderer:
             return
         width = _terminal_width()
         phase = event.phase or "…"
-        # First-line prefix shows phase + marker so readers can scan the
-        # left margin to follow the run's progression. Continuation lines
-        # indent under the text so the wrap reads as one paragraph.
         phase_tag = f"[{phase}]"
-        initial = f"  {NARRATION_MARKER} {self._color(_DIM, phase_tag)} "
-        # Visible width of the colored phase tag is its character length —
-        # ANSI escapes are zero-width, so we measure on the raw tag.
-        visible_prefix_len = len(f"  {NARRATION_MARKER} {phase_tag} ")
-        subsequent = " " * visible_prefix_len
-        body = _wrap(text, width=width, initial_indent="", subsequent_indent="")
-        # Wrap manually so the colored prefix isn't counted into the width.
-        wrapped = textwrap.fill(
-            body,
-            width=max(20, width),
-            initial_indent="",
-            subsequent_indent=subsequent,
+        # First-line prefix shows phase + marker so readers can scan the
+        # left margin to follow the run's progression. The continuation
+        # indent is a FIXED 4 spaces — independent of phase-label length —
+        # so a run with `[plan]` and a run with `[revision]` wrap to the
+        # same column and look visually consistent.
+        visible_prefix = f"  {NARRATION_MARKER} {phase_tag} "
+        visible_prefix_len = len(visible_prefix)
+        colored_prefix = f"  {NARRATION_MARKER} {self._color(_DIM, phase_tag)} "
+        subsequent_indent = "    "  # 4 spaces — constant across phases
+        # Use textwrap with initial_indent as padding-sized spaces so the
+        # wrap algorithm budgets width correctly for the first line; we
+        # replace those spaces with the real (colored) prefix afterwards.
+        initial_spaces = " " * visible_prefix_len
+        wrapper = textwrap.TextWrapper(
+            width=max(visible_prefix_len + 10, width),
+            initial_indent=initial_spaces,
+            subsequent_indent=subsequent_indent,
             break_long_words=False,
             break_on_hyphens=False,
         )
-        # Insert prefix before the first line.
-        first, _, rest = wrapped.partition("\n")
-        line = self._color(_BOLD, initial + first)
+        wrapped = wrapper.fill(text)
+        # Swap the first-line spaces for the actual colored prefix. Only
+        # the first line gets the bold treatment — bolding across newlines
+        # would bleed ANSI into terminals that don't reset per-line.
+        if wrapped.startswith(initial_spaces):
+            wrapped = colored_prefix + wrapped[len(initial_spaces):]
+        first, sep, rest = wrapped.partition("\n")
+        line = self._color(_BOLD, first)
         if rest:
-            line = line + "\n" + rest
+            line = line + sep + rest
         self._print(line)
         # narration_error is kept on the event for debugging but is NEVER
         # surfaced in the live feed — the fallback text has already been

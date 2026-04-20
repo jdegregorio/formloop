@@ -152,6 +152,31 @@ def test_default_filters_low_signal_events() -> None:
     assert buf.getvalue() == ""
 
 
+def test_narration_continuation_indent_is_constant_across_phases(monkeypatch) -> None:
+    # Regression: the continuation indent used to scale with the phase
+    # label length, so `[plan]` and `[revision]` wrapped to DIFFERENT
+    # columns and the output looked ragged. It must now be fixed.
+    monkeypatch.setattr(
+        "formloop.cli.run_renderer._terminal_width", lambda default=100: 60
+    )
+    r, buf = _renderer()
+    long_text = (
+        "we did a lot of work here and this line is certainly long enough "
+        "that it is going to have to wrap at least twice on a 60-column "
+        "terminal, which is exactly what we want for this test."
+    )
+    r(_ev(1, ProgressEventKind.narration, long_text, phase="plan"))
+    r(_ev(2, ProgressEventKind.narration, long_text, phase="revision"))
+    all_lines = buf.getvalue().rstrip("\n").splitlines()
+    # Collect only continuation (non-first) lines for each narration — they
+    # start with whitespace and not the `›` marker.
+    cont_lines = [line for line in all_lines if line and line[0] == " " and "›" not in line]
+    assert cont_lines, "expected continuation lines for a long narration"
+    leading = [len(line) - len(line.lstrip(" ")) for line in cont_lines]
+    # Every continuation line must share the same indent width.
+    assert len(set(leading)) == 1, (leading, cont_lines)
+
+
 def test_long_narration_wraps_to_terminal_width(monkeypatch) -> None:
     # Append-only mode must NEVER truncate narrations — terminals can't
     # expand history like the UI can, so the full text has to wrap.
