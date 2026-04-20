@@ -1,0 +1,149 @@
+{
+  "$id": "formloop/deterministic-metrics-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Deterministic metrics for a single eval case (wraps cad compare).",
+  "properties": {
+    "alignment": {
+      "title": "Alignment",
+      "type": "string"
+    },
+    "bbox_match": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bbox Match"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "hole_count_match": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hole Count Match"
+    },
+    "left_only_volume": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Left Only Volume"
+    },
+    "left_volume": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Left Volume"
+    },
+    "mode": {
+      "description": "'exact' or 'mesh_fallback' (from cad compare).",
+      "title": "Mode",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "overlap_ratio": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Overlap Ratio"
+    },
+    "right_only_volume": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Right Only Volume"
+    },
+    "right_volume": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Right Volume"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "shared_volume": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Shared Volume"
+    },
+    "union_volume": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Union Volume"
+    }
+  },
+  "required": [
+    "case_id",
+    "mode",
+    "alignment"
+  ],
+  "title": "DeterministicMetrics",
+  "type": "object"
+}

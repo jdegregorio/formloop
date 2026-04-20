@@ -1,5 +1,7 @@
 ## Repo Spec: Formloop
 
+<!-- REQ: FLH-V-004 — keep this spec aligned with the harness implementation. -->
+
 ### Purpose
 
 Formloop is the main application for an agentic CAD system. It turns natural-language design intent into managed CAD work by orchestrating agents, maintaining explicit design state, invoking `cad-cli`, presenting artifacts, and running developer evals.

@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "ReviewDecision": {
+      "enum": [
+        "pass",
+        "revise"
+      ],
+      "title": "ReviewDecision",
+      "type": "string"
+    }
+  },
+  "$id": "formloop/review-summary",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Concise structured output of normal design review for one revision.",
+  "properties": {
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "decision": {
+      "$ref": "#/$defs/ReviewDecision"
+    },
+    "key_findings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Key Findings",
+      "type": "array"
+    },
+    "reference_image_notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Image Notes"
+    },
+    "revision_instructions": {
+      "default": "",
+      "description": "Concrete instructions for the CAD Designer's next attempt. Empty string when decision is pass.",
+      "title": "Revision Instructions",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "suspect_dimensions_to_recheck": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Suspect Dimensions To Recheck",
+      "type": "array"
+    },
+    "suspect_or_missing_features": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Suspect Or Missing Features",
+      "type": "array"
+    }
+  },
+  "required": [
+    "decision",
+    "confidence"
+  ],
+  "title": "ReviewSummary",
+  "type": "object"
+}

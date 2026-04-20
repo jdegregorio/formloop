@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "ArtifactEntry": {
+      "additionalProperties": false,
+      "description": "One artifact in a revision bundle, keyed by stable role.",
+      "properties": {
+        "format": {
+          "description": "'step' | 'glb' | 'png' | 'json' | ...",
+          "title": "Format",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path relative to the revision folder.",
+          "title": "Path",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "role": {
+          "description": "Stable role like 'step', 'glb', 'render_sheet', 'view_front'.",
+          "title": "Role",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Bytes"
+        }
+      },
+      "required": [
+        "role",
+        "path",
+        "format"
+      ],
+      "title": "ArtifactEntry",
+      "type": "object"
+    }
+  },
+  "$id": "formloop/artifact-manifest",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Stable listing of a revision's artifacts by role.",
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/ArtifactEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "revision_name": {
+      "title": "Revision Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "revision_name",
+    "entries"
+  ],
+  "title": "ArtifactManifest",
+  "type": "object"
+}

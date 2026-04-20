@@ -1,0 +1,225 @@
+{
+  "$defs": {
+    "AgentAnswer": {
+      "additionalProperties": false,
+      "description": "Final user-facing answer synthesized by the manager (FLH-F-002).",
+      "properties": {
+        "delivered_revision_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delivered Revision Name"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "AgentAnswer",
+      "type": "object"
+    },
+    "AssumptionRecord": {
+      "additionalProperties": false,
+      "description": "A manager-recorded assumption made when spec is ambiguous (FLH-F-020).",
+      "properties": {
+        "assumption": {
+          "title": "Assumption",
+          "type": "string"
+        },
+        "recorded_at": {
+          "title": "Recorded At",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "topic": {
+          "title": "Topic",
+          "type": "string"
+        }
+      },
+      "required": [
+        "topic",
+        "assumption"
+      ],
+      "title": "AssumptionRecord",
+      "type": "object"
+    },
+    "EffectiveRuntime": {
+      "additionalProperties": false,
+      "description": "Effective runtime metadata used for this run (FLH-D-017).",
+      "properties": {
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "reasoning": {
+          "title": "Reasoning",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "profile",
+        "model",
+        "reasoning"
+      ],
+      "title": "EffectiveRuntime",
+      "type": "object"
+    },
+    "RunStatus": {
+      "enum": [
+        "created",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    }
+  },
+  "$id": "formloop/run",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Top-level persisted design or eval thread.\n\nRevisions exist only after a candidate artifact bundle has been\ngenerated and persisted (FLH-F-022).",
+  "properties": {
+    "assumptions": {
+      "items": {
+        "$ref": "#/$defs/AssumptionRecord"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "current_revision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Revision Id"
+    },
+    "current_spec": {
+      "additionalProperties": true,
+      "title": "Current Spec",
+      "type": "object"
+    },
+    "effective_runtime": {
+      "$ref": "#/$defs/EffectiveRuntime"
+    },
+    "final_answer": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AgentAnswer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "input_summary": {
+      "title": "Input Summary",
+      "type": "string"
+    },
+    "reference_image": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reference Image"
+    },
+    "revisions": {
+      "description": "Ordered list of revision names (rev-001, ...).",
+      "items": {
+        "type": "string"
+      },
+      "title": "Revisions",
+      "type": "array"
+    },
+    "run_id": {
+      "description": "Opaque unique id (uuid4).",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "run_name": {
+      "description": "Human-readable sequential name like run-0001.",
+      "title": "Run Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus",
+      "default": "created"
+    },
+    "status_detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Status Detail"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "run_name",
+    "input_summary",
+    "effective_runtime"
+  ],
+  "title": "Run",
+  "type": "object"
+}

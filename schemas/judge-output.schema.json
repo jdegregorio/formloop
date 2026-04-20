@@ -1,0 +1,55 @@
+{
+  "$id": "formloop/judge-output",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Quality Specialist judgment in eval mode.",
+  "properties": {
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "dimension_scores": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "description": "Per-dimension 0..1 scores (e.g. geometric_accuracy, feature_presence).",
+      "title": "Dimension Scores",
+      "type": "object"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    },
+    "overall_score": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Overall Score",
+      "type": "number"
+    },
+    "pass": {
+      "title": "Pass",
+      "type": "boolean"
+    },
+    "rationale": {
+      "title": "Rationale",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "case_id",
+    "overall_score",
+    "pass",
+    "rationale"
+  ],
+  "title": "JudgeOutput",
+  "type": "object"
+}

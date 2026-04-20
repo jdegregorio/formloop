@@ -1,0 +1,24 @@
+"""Persisted developer-eval judge output.
+
+REQ: FLH-F-006, FLH-F-014, FLH-F-015
+"""
+
+from __future__ import annotations
+
+from pydantic import Field
+
+from ._common import SchemaModel
+
+
+class JudgeOutput(SchemaModel):
+    """Quality Specialist judgment in eval mode."""
+
+    case_id: str
+    overall_score: float = Field(ge=0.0, le=1.0)
+    pass_: bool = Field(alias="pass")
+    dimension_scores: dict[str, float] = Field(
+        default_factory=dict,
+        description="Per-dimension 0..1 scores (e.g. geometric_accuracy, feature_presence).",
+    )
+    rationale: str
+    notes: list[str] = Field(default_factory=list)

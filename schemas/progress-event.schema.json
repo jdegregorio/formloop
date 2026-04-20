@@ -1,0 +1,65 @@
+{
+  "$defs": {
+    "ProgressEventKind": {
+      "enum": [
+        "run_created",
+        "spec_normalized",
+        "assumption_recorded",
+        "research_started",
+        "research_completed",
+        "revision_started",
+        "revision_built",
+        "revision_rendered",
+        "revision_persisted",
+        "review_started",
+        "review_completed",
+        "breadcrumb",
+        "delivered",
+        "run_failed"
+      ],
+      "title": "ProgressEventKind",
+      "type": "string"
+    }
+  },
+  "$id": "formloop/progress-event",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One append-only progress event.\n\n``message`` is human-friendly breadcrumb text (may be LLM-generated for\n``kind == breadcrumb``). ``data`` carries structured per-kind payload.",
+  "properties": {
+    "data": {
+      "additionalProperties": true,
+      "title": "Data",
+      "type": "object"
+    },
+    "index": {
+      "description": "Zero-based ordinal within the run.",
+      "minimum": 0,
+      "title": "Index",
+      "type": "integer"
+    },
+    "kind": {
+      "$ref": "#/$defs/ProgressEventKind"
+    },
+    "message": {
+      "default": "",
+      "title": "Message",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "ts": {
+      "title": "Ts",
+      "type": "string"
+    }
+  },
+  "required": [
+    "index",
+    "kind"
+  ],
+  "title": "ProgressEvent",
+  "type": "object"
+}

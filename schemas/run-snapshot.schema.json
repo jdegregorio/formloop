@@ -1,0 +1,183 @@
+{
+  "$defs": {
+    "ReviewDecision": {
+      "enum": [
+        "pass",
+        "revise"
+      ],
+      "title": "ReviewDecision",
+      "type": "string"
+    },
+    "SnapshotArtifacts": {
+      "additionalProperties": false,
+      "properties": {
+        "glb_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Glb Path"
+        },
+        "render_sheet_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Render Sheet Path"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "step_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Path"
+        },
+        "view_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "View Paths",
+          "type": "array"
+        }
+      },
+      "title": "SnapshotArtifacts",
+      "type": "object"
+    }
+  },
+  "$id": "formloop/run-snapshot",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Materialized, polling-friendly view of current run state.",
+  "properties": {
+    "artifacts": {
+      "$ref": "#/$defs/SnapshotArtifacts"
+    },
+    "current_revision_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Current Revision Name"
+    },
+    "current_spec": {
+      "additionalProperties": true,
+      "title": "Current Spec",
+      "type": "object"
+    },
+    "generated_at": {
+      "title": "Generated At",
+      "type": "string"
+    },
+    "last_event_index": {
+      "default": -1,
+      "minimum": -1,
+      "title": "Last Event Index",
+      "type": "integer"
+    },
+    "last_event_kind": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Event Kind"
+    },
+    "last_message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Message"
+    },
+    "latest_review_decision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReviewDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "latest_review_summary_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latest Review Summary Path"
+    },
+    "revisions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Revisions",
+      "type": "array"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "run_name": {
+      "title": "Run Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "run_name",
+    "status"
+  ],
+  "title": "RunSnapshot",
+  "type": "object"
+}
