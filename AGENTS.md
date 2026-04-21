@@ -251,6 +251,9 @@ Ask before:
 - standardize authoritative, presentation, internal-review, and eval artifacts early
 - CI on `main` should run meaningful batch evals, while PRs should run a smaller smoke subset
 - keep optional downstream validation outside the core loop unless intentionally added later
+- the CAD Designer is grounded by a curated Build123D knowledge pack under `src/formloop/agents/knowledge/build123d/` (12 scraped doc pages + a hand-audited `external_libs_overlay.md` covering `bd_warehouse`, `bd_vslot`, `py_gearworks`, `bd_beams_and_bars`); the designer reads from it on demand through the `build123d_lookup` function tool — do not replace this with large baked-in prompt strings
+- the CAD Designer must produce a `DesignPlan` (paradigm, paradigm rationale, primary primitives, decomposition, external-library usage, open questions) before authoring `model.py`; the orchestrator emits the plan as a `revision_planned` progress event ahead of `revision_built`
+- to refresh the knowledge pack run `uv sync --extra scrape && uv run python scripts/scrape_build123d_docs.py` and review the resulting diff (the scraper's deps are isolated to the `scrape` extra so the runtime install stays small)
 
 ## Internal review loop expectations
 

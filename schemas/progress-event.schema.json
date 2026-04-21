@@ -8,6 +8,7 @@
         "research_started",
         "research_completed",
         "revision_started",
+        "revision_planned",
         "revision_built",
         "revision_rendered",
         "revision_persisted",

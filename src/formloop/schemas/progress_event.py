@@ -20,6 +20,7 @@ class ProgressEventKind(str, Enum):
     research_started = "research_started"
     research_completed = "research_completed"
     revision_started = "revision_started"
+    revision_planned = "revision_planned"
     revision_built = "revision_built"
     revision_rendered = "revision_rendered"
     revision_persisted = "revision_persisted"

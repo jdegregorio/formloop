@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 
 from formloop.agents.cad_designer import CadRevisionResult
+from formloop.agents.cad_designer_plan import DesignPlan
 from formloop.agents.manager import (
     AssumptionProposal,
     ManagerFinalAnswer,
@@ -89,6 +90,14 @@ def _install_runner_stub(monkeypatch) -> None:
         if name == "cad_designer":
             return _FakeResult(
                 final_output=CadRevisionResult(
+                    design_plan=DesignPlan(
+                        paradigm="algebra",
+                        paradigm_rationale="stub designer chooses algebra",
+                        primary_primitives=["Box"],
+                        external_libs_used=[],
+                        decomposition=["stubbed single step"],
+                        open_questions=[],
+                    ),
                     model_py_written=False,
                     build_ok=False,
                     inspect_ok=False,
@@ -122,6 +131,27 @@ async def _drive(tmp_path: Path, monkeypatch, narrator: Narrator) -> tuple[Any, 
     )
     result = await driver.run(DriveRequest(prompt="a 20mm cube"))
     return result, captured
+
+
+async def test_revision_planned_event_emitted_with_plan_fields(tmp_path, monkeypatch) -> None:
+    """FLH-F-028 — a revision_planned event must be emitted alongside the build,
+    carrying the paradigm + decomposition the designer committed to."""
+    _, events = await _drive(
+        tmp_path, monkeypatch, narrator=Narrator(fallback_only=True)
+    )
+    planned = [ev for ev in events if ev.kind is ProgressEventKind.revision_planned]
+    assert planned, "expected at least one revision_planned event"
+    ev = planned[0]
+    # Data payload must carry the fields the CLI/UI will surface.
+    assert ev.data["paradigm"] == "algebra"
+    assert ev.data["decomposition"]
+    assert "primary_primitives" in ev.data
+    assert "external_libs_used" in ev.data
+    # Ordering: the plan event appears before the corresponding build event.
+    built_indices = [i for i, e in enumerate(events) if e.kind is ProgressEventKind.revision_built]
+    planned_indices = [i for i, e in enumerate(events) if e.kind is ProgressEventKind.revision_planned]
+    assert planned_indices and built_indices
+    assert planned_indices[0] < built_indices[0]
 
 
 async def test_narration_events_emitted_at_each_milestone(tmp_path, monkeypatch) -> None:

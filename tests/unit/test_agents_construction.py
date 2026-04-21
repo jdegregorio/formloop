@@ -55,12 +55,20 @@ def test_design_researcher_has_web_search(profile: Profile) -> None:
     assert "WebSearchTool" in tool_names
 
 
-def test_cad_designer_registers_four_tools(profile: Profile) -> None:
+def test_cad_designer_registers_tool_surface(profile: Profile) -> None:
     agent = build_cad_designer(profile)
     assert _underlying_type(agent) is CadRevisionResult
-    # Four tools: write_model, build_model_cli, inspect_model, render_model.
+    # Five tools: write_model, build_model_cli, inspect_model, render_model,
+    # build123d_lookup (the knowledge-pack on-demand lookup, FLH-F-029).
     tool_names = {getattr(t, "name", t.__class__.__name__) for t in agent.tools}
-    assert {"write_model", "build_model_cli", "inspect_model", "render_model"} <= tool_names
+    expected = {
+        "write_model",
+        "build_model_cli",
+        "inspect_model",
+        "render_model",
+        "build123d_lookup",
+    }
+    assert expected <= tool_names, tool_names
 
 
 def test_quality_specialist_modes(profile: Profile) -> None:

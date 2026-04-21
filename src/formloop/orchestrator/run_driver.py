@@ -464,6 +464,27 @@ class RunDriver:
                 designer_agent, input=designer_input, context=run_ctx, max_turns=24
             )
             cad_out: CadRevisionResult = designer_run.final_output
+            # The design plan is produced alongside the build in the same
+            # agent turn (single LLM call, not an extra round-trip). Emit it
+            # as its own milestone so the CLI/UI can surface the approach the
+            # designer committed to before authoring model.py.
+            plan_data = cad_out.design_plan.model_dump()
+            self._emit(
+                run.run_name,
+                ProgressEventKind.revision_planned,
+                message=(
+                    f"designer chose paradigm={plan_data['paradigm']} "
+                    f"with {len(plan_data['decomposition'])} decomposition step(s)"
+                ),
+                data={
+                    "attempt": attempt,
+                    "paradigm": plan_data["paradigm"],
+                    "primary_primitives": plan_data["primary_primitives"],
+                    "external_libs_used": plan_data["external_libs_used"],
+                    "decomposition": plan_data["decomposition"],
+                    "open_questions": plan_data["open_questions"],
+                },
+            )
             self._emit(
                 run.run_name,
                 ProgressEventKind.revision_built,
@@ -499,6 +520,11 @@ class RunDriver:
                     "dimensions": dict(cad_out.dimensions or {}),
                     "known_risks": list(cad_out.known_risks or [])[:3],
                     "build_errors": list(cad_out.build_errors or [])[:2],
+                    # Surface the paradigm and first decomposition step so the
+                    # live narration can cite the approach the designer took.
+                    "paradigm": plan_data["paradigm"],
+                    "decomposition_head": (plan_data["decomposition"] or [""])[0][:140],
+                    "external_libs_used": plan_data["external_libs_used"],
                 },
                 fallback=_fallback_revision_built(cad_out),
             )

@@ -1,0 +1,20 @@
+{
+  "scraped_at": "2026-04-20T18:57:47Z",
+  "base_url": "https://build123d.readthedocs.io/en/latest/",
+  "page_count": 12,
+  "etags": {
+    "key_concepts": null,
+    "key_concepts_builder": null,
+    "key_concepts_algebra": null,
+    "moving_objects": null,
+    "objects": null,
+    "operations": null,
+    "topology_selection": null,
+    "builders": null,
+    "joints": null,
+    "assemblies": null,
+    "import_export": null,
+    "cheat_sheet": null
+  },
+  "scraper_version": 1
+}

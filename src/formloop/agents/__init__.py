@@ -4,6 +4,7 @@ REQ: FLH-D-007, FLH-D-008, FLH-D-009, FLH-D-010
 """
 
 from .cad_designer import CadRevisionResult, build_cad_designer
+from .cad_designer_plan import DesignParadigm, DesignPlan
 from .common import PromptContext, RunContext, Runner
 from .design_researcher import (
     ResearchCitation,
@@ -32,6 +33,8 @@ __all__ = [
     "AssumptionProposal",
     "CadRevisionResult",
     "DEFAULT_NARRATOR_PROFILE",
+    "DesignParadigm",
+    "DesignPlan",
     "ManagerFinalAnswer",
     "ManagerPlan",
     "NarrationInput",

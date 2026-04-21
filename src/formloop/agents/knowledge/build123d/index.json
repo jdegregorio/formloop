@@ -1,0 +1,195 @@
+{
+  "pages": [
+    {
+      "slug": "key_concepts",
+      "title": "Key Concepts",
+      "source_url": "https://build123d.readthedocs.io/en/latest/key_concepts.html",
+      "headings": [
+        "Key Concepts",
+        "Topology",
+        "Location",
+        "Selectors",
+        "Quick Reference",
+        "ShapeList Class",
+        "Custom Sorting and Filtering"
+      ],
+      "char_count": 14443
+    },
+    {
+      "slug": "key_concepts_builder",
+      "title": "Key Concepts (builder mode)",
+      "source_url": "https://build123d.readthedocs.io/en/latest/key_concepts_builder.html",
+      "headings": [
+        "Key Concepts (builder mode)",
+        "Understanding the Builder Paradigm",
+        "How the Builder Works",
+        "Example Workflow",
+        "Key Concepts",
+        "Analogy: Adding Numbers on Paper",
+        "Builders",
+        "Implicit Builder Instance Variables",
+        "Workplanes",
+        "Locations Context",
+        "Operation Inputs",
+        "Combination Modes",
+        "Using Locations & Rotating Objects",
+        "Builder\u2019s Pending Objects"
+      ],
+      "char_count": 16394
+    },
+    {
+      "slug": "key_concepts_algebra",
+      "title": "Key Concepts (algebra mode)",
+      "source_url": "https://build123d.readthedocs.io/en/latest/key_concepts_algebra.html",
+      "headings": [
+        "Key Concepts (algebra mode)",
+        "Object arithmetic",
+        "Placement arithmetic",
+        "Combing both concepts"
+      ],
+      "char_count": 4320
+    },
+    {
+      "slug": "moving_objects",
+      "title": "Moving Objects",
+      "source_url": "https://build123d.readthedocs.io/en/latest/moving_objects.html",
+      "headings": [
+        "Moving Objects",
+        "Builder Mode",
+        "Algebra Mode",
+        "Direct Manipulation Methods",
+        "Position",
+        "Orientation",
+        "Movement Methods",
+        "Transformation a.k.a. Translation and Rotation"
+      ],
+      "char_count": 4466
+    },
+    {
+      "slug": "objects",
+      "title": "Objects",
+      "source_url": "https://build123d.readthedocs.io/en/latest/objects.html",
+      "headings": [
+        "Objects",
+        "Align",
+        "Mode",
+        "1D Objects",
+        "Reference",
+        "2D Objects",
+        "3D Objects",
+        "Text",
+        "Create Text Object",
+        "Placement",
+        "Single Line Fonts",
+        "Common Issues",
+        "Custom Objects"
+      ],
+      "char_count": 120460
+    },
+    {
+      "slug": "operations",
+      "title": "Operations",
+      "source_url": "https://build123d.readthedocs.io/en/latest/operations.html",
+      "headings": [
+        "Operations",
+        "Reference"
+      ],
+      "char_count": 50995
+    },
+    {
+      "slug": "topology_selection",
+      "title": "Topology Selection and Exploration",
+      "source_url": "https://build123d.readthedocs.io/en/latest/topology_selection.html",
+      "headings": [
+        "Topology Selection and Exploration",
+        "Selectors",
+        "Overview",
+        "Select In Build Context",
+        "Select New Edges In Algebra Mode",
+        "Operators",
+        "Sort",
+        "Group",
+        "Filter"
+      ],
+      "char_count": 17214
+    },
+    {
+      "slug": "builders",
+      "title": "Builders",
+      "source_url": "https://build123d.readthedocs.io/en/latest/builders.html",
+      "headings": [
+        "Builders"
+      ],
+      "char_count": 2140
+    },
+    {
+      "slug": "joints",
+      "title": "Joints",
+      "source_url": "https://build123d.readthedocs.io/en/latest/joints.html",
+      "headings": [
+        "Joints",
+        "Rigid Joint",
+        "Revolute Joint",
+        "Linear Joint",
+        "Cylindrical Joint",
+        "Ball Joint"
+      ],
+      "char_count": 32700
+    },
+    {
+      "slug": "assemblies",
+      "title": "Assemblies",
+      "source_url": "https://build123d.readthedocs.io/en/latest/assemblies.html",
+      "headings": [
+        "Assemblies",
+        "Assigning Labels",
+        "Create the Assembly Compound",
+        "Shallow vs. Deep Copies of Shapes",
+        "Shapes are Anytree Nodes",
+        "Iterating Over Compounds",
+        "pack",
+        "Detailed Description",
+        "Usage Note",
+        "Example Usage",
+        "Tip"
+      ],
+      "char_count": 12208
+    },
+    {
+      "slug": "import_export",
+      "title": "Import/Export",
+      "source_url": "https://build123d.readthedocs.io/en/latest/import_export.html",
+      "headings": [
+        "Import/Export",
+        "File Formats",
+        "3MF",
+        "BREP",
+        "DXF",
+        "glTF",
+        "STL",
+        "STEP",
+        "SVG",
+        "2D Exporters",
+        "3D to 2D Projection",
+        "LineType",
+        "ExportDXF",
+        "ExportSVG",
+        "3D Exporters",
+        "3D Mesh Export",
+        "2D Importers",
+        "3D Importers",
+        "3D Mesh Import"
+      ],
+      "char_count": 34511
+    },
+    {
+      "slug": "cheat_sheet",
+      "title": "Cheat Sheet",
+      "source_url": "https://build123d.readthedocs.io/en/latest/cheat_sheet.html",
+      "headings": [
+        "Cheat Sheet"
+      ],
+      "char_count": 24884
+    }
+  ]
+}
