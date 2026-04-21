@@ -9,6 +9,7 @@ REQ: FLH-D-025
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,7 +26,7 @@ from ..agents import (
     build_manager_plan,
     build_quality_specialist_review,
 )
-from ..agents.cad_designer import CadRevisionResult
+from ..agents.cad_designer import CadRevisionResult, library_primer_for
 from ..agents.manager import ManagerFinalAnswer, ManagerPlan
 from ..config.profiles import HarnessConfig, Profile
 from ..schemas import (
@@ -159,6 +160,83 @@ def _fallback_review(review) -> str:
     if review.key_findings:
         return f"review {decision}: {review.key_findings[0][:160]}"
     return f"review {decision}"
+
+
+def _png_to_data_url(path: Path) -> str | None:
+    """Return a base64 data URL for a PNG, or ``None`` if the file is missing."""
+
+    if not path.is_file():
+        return None
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    if not data:
+        return None
+    b64 = base64.b64encode(data).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
+def _build_reviewer_input(
+    *,
+    payload: dict[str, Any],
+    render_sheet: Path | None,
+    reference_image: Path | None,
+) -> str | list[dict[str, Any]]:
+    """Assemble the reviewer input as text+image content when images are available.
+
+    The Agents SDK accepts a plain string OR a list of input messages whose
+    content parts can include ``input_image`` blocks (OpenAI Responses shape).
+    When the render sheet is present we return the multimodal form so the
+    model can see the part. Falls back to a plain string otherwise.
+    """
+
+    header = (
+        "Review this revision and produce a ReviewSummary.\n\n"
+        "Below: (1) the normalized spec, designer notes, dimensions, and "
+        "inspect summary as JSON; (2) the 7-view render sheet of the built "
+        "solid as an image — STUDY IT VISUALLY to confirm features actually "
+        "appear (threads visible as helical grooves, gear teeth with correct "
+        "count and profile, fillets/chamfers, hole positions, etc.). If the "
+        "user supplied a reference image, it follows as a third block.\n\n"
+        "Inspect-summary dimensions alone are NOT enough — a model can match "
+        "a bounding box and still be the wrong shape. Flag visible mismatches "
+        "in key_findings and decide 'revise' when the render disagrees with "
+        "the spec.\n\n"
+        "Inputs (JSON):\n"
+        + json.dumps(payload, indent=2, default=str)
+    )
+
+    sheet_url = _png_to_data_url(render_sheet) if render_sheet else None
+    ref_url = _png_to_data_url(reference_image) if reference_image else None
+    if not sheet_url and not ref_url:
+        return header  # plain string — no images available
+
+    content: list[dict[str, Any]] = [{"type": "input_text", "text": header}]
+    if sheet_url:
+        content.append(
+            {
+                "type": "input_text",
+                "text": (
+                    "[Render sheet — 7 orthographic + iso views of the built "
+                    "solid, arranged on a single PNG.]"
+                ),
+            }
+        )
+        content.append(
+            {"type": "input_image", "image_url": sheet_url, "detail": "auto"}
+        )
+    if ref_url:
+        content.append(
+            {
+                "type": "input_text",
+                "text": "[User reference image — the part this revision should resemble.]",
+            }
+        )
+        content.append(
+            {"type": "input_image", "image_url": ref_url, "detail": "auto"}
+        )
+    return [{"role": "user", "content": content}]
 
 
 class RunDriver:
@@ -455,10 +533,25 @@ class RunDriver:
                 prior_review=prior_review,
             )
             designer_agent = build_cad_designer(profile)
+            # Scan the spec + prompt for library-trigger keywords and, when
+            # hit, prepend a high-priority routing block to the user input.
+            # This puts the concrete import + rationale where the model pays
+            # the most attention, so gear/thread/v-slot/beam prompts land on
+            # the specialized library rather than getting hand-rolled.
+            primer = library_primer_for(
+                " ".join(
+                    [
+                        user_prompt,
+                        plan.design_brief or "",
+                        json.dumps(plan.normalized_spec, default=str),
+                    ]
+                )
+            )
             designer_input = (
-                f"Design brief:\n{plan.design_brief}\n\n"
-                f"Context (JSON):\n{prompt_ctx.to_prompt_text()}\n\n"
-                "Author model.py, build, inspect, render, then return CadRevisionResult."
+                primer
+                + f"Design brief:\n{plan.design_brief}\n\n"
+                + f"Context (JSON):\n{prompt_ctx.to_prompt_text()}\n\n"
+                + "Author model.py, build, inspect, render, then return CadRevisionResult."
             )
             designer_run = await Runner.run(
                 designer_agent, input=designer_input, context=run_ctx, max_turns=24
@@ -579,6 +672,11 @@ class RunDriver:
                 build_metadata_src=build_meta if build_meta.is_file() else None,
                 render_metadata_src=render_meta if render_meta.is_file() else None,
                 inspect_summary_src=inspect_src,
+                # Snapshot the model.py the designer wrote THIS revision,
+                # plus the structured DesignPlan. inputs/model.py is mutated
+                # each revision; the rev bundle keeps the history.
+                model_py_src=run_ctx.inputs_dir / "model.py",
+                design_plan_json=cad_out.design_plan.model_dump_json(indent=2),
             )
             fresh = self.store.load_run(run.run_name)
             revision, _ = self.store.persist_revision(fresh, bundle)
@@ -639,14 +737,23 @@ class RunDriver:
             "designer_dimensions": cad_out.dimensions,
             "known_risks": cad_out.known_risks,
             "inspect_summary": run_ctx.notes.get("last_inspect"),
-            "render_sheet": "7-view composite (front/back/left/right/top/bottom/iso)",
         }
+        # Build a multimodal message: text (spec + inspect + notes) PLUS the
+        # actual render sheet and, if present, the user's reference image.
+        # Passing the image is the whole point of the reviewer — dimensions
+        # alone miss visual defects like gear teeth that look nothing like
+        # an involute or threads that never got modeled. Falls back to text-
+        # only if the artifact is missing (e.g. render failed).
+        render_sheet_path = self._latest_render_sheet(run.run_name, revision)
+        reference_image_path = self._reference_image_path(run, run_ctx)
+        reviewer_input = _build_reviewer_input(
+            payload=payload,
+            render_sheet=render_sheet_path,
+            reference_image=reference_image_path,
+        )
         reviewer_run = await Runner.run(
             reviewer,
-            input=(
-                "Review this revision and produce a ReviewSummary.\n\n"
-                + json.dumps(payload, indent=2, default=str)
-            ),
+            input=reviewer_input,
         )
         review: ReviewSummary = reviewer_run.final_output
         fresh = self.store.load_run(run.run_name)
@@ -724,6 +831,24 @@ class RunDriver:
         return result.final_output
 
     # ---- helpers ---------------------------------------------------------
+
+    def _latest_render_sheet(self, run_name: str, revision: Revision) -> Path | None:
+        """Return the on-disk render-sheet for the revision just persisted."""
+
+        layout = self.store.runs_root / run_name / "revisions" / revision.revision_name
+        candidate = layout / "render-sheet.png"
+        return candidate if candidate.is_file() else None
+
+    def _reference_image_path(self, run, run_ctx) -> Path | None:
+        """Return the user-supplied reference image path if the run has one."""
+
+        ref = getattr(run, "reference_image", None)
+        if not ref:
+            return None
+        p = Path(ref)
+        if not p.is_absolute():
+            p = run_ctx.run_root / p
+        return p if p.is_file() else None
 
     def _emit(
         self,

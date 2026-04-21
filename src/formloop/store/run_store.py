@@ -68,6 +68,11 @@ class CandidateBundle:
     build_metadata_src: Path | None = None
     render_metadata_src: Path | None = None
     inspect_summary_src: Path | None = None
+    # Per-revision snapshot of the build123d source + the DesignPlan — the
+    # shared inputs/model.py gets overwritten each revision so we keep an
+    # auditable copy here (FLH-F-011 traceability).
+    model_py_src: Path | None = None
+    design_plan_json: str | None = None
 
 
 class RunStore:
@@ -214,6 +219,12 @@ class RunStore:
         if bundle.designer_notes:
             rev_layout.designer_notes.write_text(bundle.designer_notes, encoding="utf-8")
 
+        # Per-revision source + design plan snapshots (FLH-F-011).
+        if bundle.model_py_src is not None and bundle.model_py_src.is_file():
+            self._copy_file(bundle.model_py_src, rev_layout.model_py)
+        if bundle.design_plan_json:
+            rev_layout.design_plan.write_text(bundle.design_plan_json, encoding="utf-8")
+
         # Build the manifest.
         entries: list[ArtifactEntry] = [
             ArtifactEntry(role="step", path="step.step", format="step"),
@@ -251,6 +262,24 @@ class RunStore:
                 ArtifactEntry(
                     role="inspect_summary",
                     path="inspect-summary.json",
+                    format="json",
+                    required=False,
+                )
+            )
+        if rev_layout.model_py.is_file():
+            entries.append(
+                ArtifactEntry(
+                    role="model_py",
+                    path="model.py",
+                    format="python",
+                    required=False,
+                )
+            )
+        if rev_layout.design_plan.is_file():
+            entries.append(
+                ArtifactEntry(
+                    role="design_plan",
+                    path="design-plan.json",
                     format="json",
                     required=False,
                 )

@@ -136,6 +136,47 @@ def _external_lib_prelude(topic: str) -> str:
     return ""
 
 
+def library_primer_for(text: str) -> str:
+    """Return a high-priority library primer for text containing trigger words.
+
+    Designed to be prepended to the designer's *user input* (not the static
+    INSTRUCTIONS), so when a prompt mentions gears/threads/v-slot/beams the
+    designer sees a concrete import + rationale + pointer into the knowledge
+    pack at very high attention, before planning. Returns an empty string
+    when no trigger matches.
+    """
+
+    lowered = text.lower()
+    blocks: list[str] = []
+    seen: set[int] = set()
+    for idx, (triggers, snippet, rationale) in enumerate(_EXTERNAL_LIB_TRIGGERS):
+        if idx in seen:
+            continue
+        if any(t in lowered for t in triggers):
+            seen.add(idx)
+            hit = sorted({t for t in triggers if t in lowered})[:3]
+            blocks.append(
+                "Library primer — the spec mentions "
+                + ", ".join(repr(h) for h in hit)
+                + ".\n"
+                + rationale
+                + "\n"
+                + "Use this import as your starting point:\n"
+                + f"```python\n{snippet}\n```\n"
+                + "Before authoring, call `build123d_lookup` with a phrase "
+                "like the trigger above to pull additional docs.\n"
+            )
+    if not blocks:
+        return ""
+    return (
+        "## HIGH-PRIORITY LIBRARY ROUTING (read before you plan)\n\n"
+        + "\n".join(blocks)
+        + "\nIf you decide NOT to use one of these libraries, you must justify "
+        "that choice explicitly in DesignPlan.paradigm_rationale — the default "
+        "is to USE the library.\n\n"
+    )
+
+
 def _build_instructions() -> str:
     """Compose the INSTRUCTIONS string, inlining a trimmed cheat sheet slice.
 

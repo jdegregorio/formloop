@@ -59,6 +59,19 @@ class RevisionLayout:
     def designer_notes(self) -> Path:
         return self.root / "designer-notes.md"
 
+    @property
+    def model_py(self) -> Path:
+        # Per-revision snapshot of the build123d source the designer authored
+        # for this revision. ``inputs/model.py`` gets overwritten every revision,
+        # so we copy it here at persist time to keep an auditable history.
+        return self.root / "model.py"
+
+    @property
+    def design_plan(self) -> Path:
+        # Per-revision DesignPlan snapshot (paradigm, primitives, decomposition,
+        # external libs used, open questions) the designer committed to.
+        return self.root / "design-plan.json"
+
 
 @dataclass(frozen=True, slots=True)
 class RunLayout:

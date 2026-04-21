@@ -197,6 +197,82 @@ def test_snapshot_tracks_last_event(
     assert snap.last_event_index >= 1
 
 
+def test_persist_revision_snapshots_model_py_and_design_plan(
+    store: RunStore, effective_runtime: EffectiveRuntime, tmp_path: Path
+) -> None:
+    """Each revision gets its own frozen copy of model.py + design-plan.json.
+
+    REQ: FLH-F-011 traceability — ``inputs/model.py`` is overwritten each
+    revision, so the rev bundle must keep an auditable per-revision snapshot
+    of the build123d source the designer actually committed this turn.
+    """
+
+    run, layout = store.create_run(
+        input_summary="cube", effective_runtime=effective_runtime
+    )
+    # First revision: write a model.py under the run's inputs dir and pass
+    # its path + a design-plan JSON blob into the bundle.
+    model_src = layout.inputs_dir / "model.py"
+    model_src.write_text("# rev-001 source\nPART_V1 = 1\n")
+    plan_json_v1 = '{"paradigm": "algebra", "primary_primitives": ["Box"]}'
+    bundle_a = _make_bundle(tmp_path / "a")
+    bundle_a.model_py_src = model_src
+    bundle_a.design_plan_json = plan_json_v1
+
+    rev1, rev1_layout = store.persist_revision(run, bundle_a)
+
+    assert rev1_layout.model_py.is_file()
+    assert rev1_layout.model_py.read_text() == "# rev-001 source\nPART_V1 = 1\n"
+    assert rev1_layout.design_plan.is_file()
+    assert rev1_layout.design_plan.read_text() == plan_json_v1
+
+    # Manifest surfaces both as optional entries.
+    manifest = json.loads(rev1_layout.artifact_manifest.read_text())
+    roles = {e["role"]: e for e in manifest["entries"]}
+    assert roles["model_py"]["path"] == "model.py"
+    assert roles["model_py"]["format"] == "python"
+    assert roles["design_plan"]["path"] == "design-plan.json"
+    assert roles["design_plan"]["format"] == "json"
+
+    # Second revision: the designer overwrites inputs/model.py with new
+    # source. rev-001 must retain the OLD source — that's the whole point.
+    model_src.write_text("# rev-002 source\nPART_V2 = 2\n")
+    plan_json_v2 = '{"paradigm": "builder", "primary_primitives": ["BuildPart"]}'
+    bundle_b = _make_bundle(tmp_path / "b", trigger=RevisionTrigger.review_revise)
+    bundle_b.model_py_src = model_src
+    bundle_b.design_plan_json = plan_json_v2
+
+    rev2, rev2_layout = store.persist_revision(run, bundle_b)
+
+    assert rev2_layout.model_py.read_text() == "# rev-002 source\nPART_V2 = 2\n"
+    # rev-001's copy is untouched — history is preserved.
+    assert rev1_layout.model_py.read_text() == "# rev-001 source\nPART_V1 = 1\n"
+    assert rev2_layout.design_plan.read_text() == plan_json_v2
+    assert rev1_layout.design_plan.read_text() == plan_json_v1
+
+
+def test_persist_revision_skips_model_py_when_missing(
+    store: RunStore, effective_runtime: EffectiveRuntime, tmp_path: Path
+) -> None:
+    """Missing model_py_src must not crash persistence.
+
+    Not every rev has to carry source (e.g. a bundle-less attempt shouldn't
+    be persisted at all, but defensive behavior still matters).
+    """
+
+    run, _ = store.create_run(input_summary="x", effective_runtime=effective_runtime)
+    bundle = _make_bundle(tmp_path)
+    # model_py_src left as None (default), design_plan_json left as None.
+    rev, rev_layout = store.persist_revision(run, bundle)
+
+    assert not rev_layout.model_py.is_file()
+    assert not rev_layout.design_plan.is_file()
+    manifest = json.loads(rev_layout.artifact_manifest.read_text())
+    roles = {e["role"] for e in manifest["entries"]}
+    assert "model_py" not in roles
+    assert "design_plan" not in roles
+
+
 def test_atomic_write_leaves_no_tmp_file(
     store: RunStore, effective_runtime: EffectiveRuntime
 ) -> None:
