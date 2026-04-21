@@ -22,8 +22,13 @@ agent_run = 600
 # Profiles (FLH-D-017). Each maps to an OpenAI model + reasoning level.
 [profiles.normal]
 model = "gpt-5.4"
+reasoning = "medium"
+description = "Default user-facing execution and eval execution. Medium reasoning keeps runs quick without sacrificing the reviewer's ability to catch visual feature defects."
+
+[profiles.thorough]
+model = "gpt-5.4"
 reasoning = "high"
-description = "Normal user-facing execution and eval execution."
+description = "High-reasoning variant for hard cases or regression investigation. Noticeably slower and more expensive."
 
 [profiles.dev_test]
 model = "gpt-5.4-nano"
