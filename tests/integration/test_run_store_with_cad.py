@@ -60,6 +60,7 @@ def test_persist_revision_from_real_cad(
         spec_snapshot={"kind": "cube", "size": 16},
         designer_notes="Used cube.py with size=16.",
         known_risks=[],
+        model_py_src=cube_model,
         step_src=build.step_path,
         glb_src=build.glb_path,
         views_dir_src=views_staging,
@@ -70,6 +71,8 @@ def test_persist_revision_from_real_cad(
     )
     revision, rev_layout = store.persist_revision(run, bundle)
 
+    assert rev_layout.model_py.is_file() and rev_layout.model_py.stat().st_size > 0
+    assert rev_layout.model_py.read_bytes() == cube_model.read_bytes()
     assert rev_layout.step.is_file() and rev_layout.step.stat().st_size > 0
     assert rev_layout.glb.is_file() and rev_layout.glb.stat().st_size > 0
     assert rev_layout.render_sheet.is_file()

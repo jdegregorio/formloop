@@ -61,6 +61,7 @@ class CandidateBundle:
     spec_snapshot: dict[str, Any]
     designer_notes: str | None
     known_risks: list[str]
+    model_py_src: Path
     step_src: Path
     glb_src: Path
     views_dir_src: Path
@@ -196,6 +197,7 @@ class RunStore:
         rev_layout.views_dir.mkdir(parents=True, exist_ok=True)
 
         # Copy core artifacts.
+        self._copy_file(bundle.model_py_src, rev_layout.model_py)
         self._copy_file(bundle.step_src, rev_layout.step)
         self._copy_file(bundle.glb_src, rev_layout.glb)
         self._copy_file(bundle.render_sheet_src, rev_layout.render_sheet)
@@ -216,6 +218,7 @@ class RunStore:
 
         # Build the manifest.
         entries: list[ArtifactEntry] = [
+            ArtifactEntry(role="model_py", path="model.py", format="python"),
             ArtifactEntry(role="step", path="step.step", format="step"),
             ArtifactEntry(role="glb", path="model.glb", format="glb"),
             ArtifactEntry(role="render_sheet", path="render-sheet.png", format="png"),

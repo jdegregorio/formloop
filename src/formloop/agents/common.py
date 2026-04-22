@@ -58,7 +58,7 @@ class RunContext:
 
     run_name: str
     run_root: Path
-    inputs_dir: Path
+    source_dir: Path
     profile: Profile
     assumptions: list[AssumptionRecord] = field(default_factory=list)
     research_topics: list[str] = field(default_factory=list)

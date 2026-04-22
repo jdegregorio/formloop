@@ -60,6 +60,7 @@ def _seed_run_with_revision(store: RunStore, tmp_path: Path):
     )
     src = tmp_path / "src"
     src.mkdir()
+    (src / "model.py").write_text("def build_model(params, context):\n    return None\n")
     (src / "step.step").write_text("ISO-STEP")
     (src / "model.glb").write_bytes(b"glb")
     (src / "sheet.png").write_bytes(b"png-data")
@@ -71,6 +72,7 @@ def _seed_run_with_revision(store: RunStore, tmp_path: Path):
         spec_snapshot={"kind": "cube"},
         designer_notes=None,
         known_risks=[],
+        model_py_src=src / "model.py",
         step_src=src / "step.step",
         glb_src=src / "model.glb",
         views_dir_src=views,

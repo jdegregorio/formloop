@@ -35,6 +35,8 @@ def effective_runtime() -> EffectiveRuntime:
 def _make_bundle(tmp: Path, trigger: RevisionTrigger = RevisionTrigger.initial) -> CandidateBundle:
     src = tmp / "src"
     src.mkdir(parents=True, exist_ok=True)
+    model_py = src / "model.py"
+    model_py.write_text("def build_model(params, context):\n    return None\n")
     step = src / "step.step"
     step.write_text("ISO-STEP\n")
     glb = src / "model.glb"
@@ -54,6 +56,7 @@ def _make_bundle(tmp: Path, trigger: RevisionTrigger = RevisionTrigger.initial) 
         spec_snapshot={"kind": "cube", "size": 20},
         designer_notes="Initial cube attempt.",
         known_risks=[],
+        model_py_src=model_py,
         step_src=step,
         glb_src=glb,
         views_dir_src=views,
@@ -124,6 +127,7 @@ def test_persist_revision_copies_bundle(
 
     assert revision.revision_name == "rev-001"
     assert revision.ordinal == 1
+    assert rev_layout.model_py.is_file()
     assert rev_layout.step.is_file()
     assert rev_layout.glb.is_file()
     assert rev_layout.render_sheet.is_file()
@@ -141,7 +145,9 @@ def test_persist_revision_copies_bundle(
     # Manifest records required + optional entries
     manifest = json.loads(rev_layout.artifact_manifest.read_text())
     roles = {e["role"] for e in manifest["entries"]}
-    assert {"step", "glb", "render_sheet"}.issubset(roles)
+    assert {"model_py", "step", "glb", "render_sheet"}.issubset(roles)
+    model_py_entry = next(e for e in manifest["entries"] if e["role"] == "model_py")
+    assert model_py_entry["path"] == "model.py"
     assert any(r.startswith("view_") for r in roles)
     assert "build_metadata" in roles
     assert "inspect_summary" in roles
