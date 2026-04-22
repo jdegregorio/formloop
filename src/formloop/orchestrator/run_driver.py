@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -49,6 +50,8 @@ from .narrator import Narrator
 class DriveRequest:
     prompt: str
     profile_name: str | None = None
+    model_override: str | None = None
+    reasoning_override: str | None = None
     reference_image: str | None = None
     max_revisions: int | None = None
 
@@ -187,6 +190,12 @@ class RunDriver:
         """
 
         profile = self.config.profile(request.profile_name)
+        if request.model_override or request.reasoning_override:
+            profile = dataclasses.replace(
+                profile,
+                model=request.model_override or profile.model,
+                reasoning=request.reasoning_override or profile.reasoning,
+            )
         max_revisions = request.max_revisions or self.config.max_revisions
         run, layout = self.store.create_run(
             input_summary=request.prompt,
@@ -778,6 +787,8 @@ async def drive_run(
     *,
     config: HarnessConfig,
     profile: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
     reference_image: str | None = None,
     max_revisions: int | None = None,
     event_hook: Callable[[ProgressEvent], None] | None = None,
@@ -788,6 +799,8 @@ async def drive_run(
         DriveRequest(
             prompt=prompt,
             profile_name=profile,
+            model_override=model,
+            reasoning_override=effort,
             reference_image=reference_image,
             max_revisions=max_revisions,
         )
