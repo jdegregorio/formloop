@@ -16,7 +16,14 @@ from .run import (
 )
 from .revision import Revision, RevisionTrigger
 from .artifact_manifest import ArtifactEntry, ArtifactManifest
-from .review_summary import ReviewDecision, ReviewSummary
+from .review_summary import (
+    ChecklistCategory,
+    ChecklistItem,
+    ChecklistMethod,
+    ChecklistVerdict,
+    ReviewDecision,
+    ReviewSummary,
+)
 from .run_snapshot import RunSnapshot, SnapshotArtifacts
 from .progress_event import ProgressEvent, ProgressEventKind
 from .deterministic_metrics import DeterministicMetrics
@@ -28,6 +35,10 @@ __all__ = [
     "ArtifactEntry",
     "ArtifactManifest",
     "AssumptionRecord",
+    "ChecklistCategory",
+    "ChecklistItem",
+    "ChecklistMethod",
+    "ChecklistVerdict",
     "DeterministicMetrics",
     "EffectiveRuntime",
     "JudgeOutput",

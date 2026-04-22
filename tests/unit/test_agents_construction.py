@@ -70,3 +70,31 @@ def test_quality_specialist_modes(profile: Profile) -> None:
     assert _underlying_type(judge) is JudgeOutput
     # The two modes must use distinct instruction bodies (FLH-F-006/014 differ).
     assert review.instructions != judge.instructions
+
+
+def test_quality_specialist_prompts_are_multimodal(profile: Profile) -> None:
+    """The reviewer/judge must instruct the model to use images + checklist.
+
+    Guards the multi-modal intent of the Quality Specialist (FLH-F-007,
+    FLH-F-014): rendered views are primary evidence, a spec-derived feature
+    checklist is required, and a reference image (when attached) must be
+    compared visually.
+    """
+
+    review = build_quality_specialist_review(profile)
+    judge = build_quality_specialist_judge(profile)
+    for instructions in (review.instructions, judge.instructions):
+        assert "feature_checklist" in instructions
+        assert "reference image" in instructions.lower()
+        assert "render" in instructions.lower()
+        # Every spec feature category must be named so the reviewer knows what
+        # to enumerate.
+        for category in (
+            "primitive",
+            "subtracted",
+            "added",
+            "edge_treatment",
+            "pattern",
+            "thread",
+        ):
+            assert category in instructions.lower()

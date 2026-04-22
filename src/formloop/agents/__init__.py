@@ -4,7 +4,13 @@ REQ: FLH-D-007, FLH-D-008, FLH-D-009, FLH-D-010
 """
 
 from .cad_designer import CadRevisionResult, build_cad_designer
-from .common import PromptContext, RunContext, Runner
+from .common import (
+    PromptContext,
+    RunContext,
+    Runner,
+    build_multimodal_user_message,
+    encode_image_data_url,
+)
 from .design_researcher import (
     ResearchCitation,
     ResearchFinding,
@@ -45,7 +51,9 @@ __all__ = [
     "build_design_researcher",
     "build_manager_final",
     "build_manager_plan",
+    "build_multimodal_user_message",
     "build_narrator",
     "build_quality_specialist_judge",
     "build_quality_specialist_review",
+    "encode_image_data_url",
 ]

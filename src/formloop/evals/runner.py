@@ -6,12 +6,17 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from ..agents import Runner, build_quality_specialist_judge
+from ..agents import (
+    Runner,
+    build_multimodal_user_message,
+    build_quality_specialist_judge,
+)
 from ..config.profiles import HarnessConfig
 from ..orchestrator import RunDriver
 from ..orchestrator.run_driver import DriveRequest
 from ..runtime.cad_cli import cad_compare
 from ..schemas import DeterministicMetrics, JudgeOutput
+from ..store.layout import RunLayout
 from .dataset import EvalCase, load_cases
 
 
@@ -23,6 +28,28 @@ def _batch_dir(config: HarnessConfig, batch_name: str) -> Path:
 
 def _delivered_step(config: HarnessConfig, run_name: str, rev_name: str) -> Path:
     return config.runs_dir / run_name / "revisions" / rev_name / "step.step"
+
+
+def _delivered_revision_layout(config: HarnessConfig, run_name: str, rev_name: str):
+    return RunLayout(runs_root=config.runs_dir, run_name=run_name).revision(rev_name)
+
+
+_JUDGE_VIEW_ORDER = ("iso", "front", "top", "right", "back", "left", "bottom")
+
+
+def _judge_image_paths(
+    *,
+    reference_image: Path | None,
+    render_sheet: Path,
+    views_dir: Path,
+) -> list[tuple[str, Path]]:
+    pairs: list[tuple[str, Path]] = []
+    if reference_image is not None:
+        pairs.append(("REFERENCE IMAGE:", reference_image))
+    pairs.append(("RENDER SHEET (7-view composite):", render_sheet))
+    for name in _JUDGE_VIEW_ORDER:
+        pairs.append((f"{name.upper()} VIEW:", views_dir / f"{name}.png"))
+    return pairs
 
 
 async def run_eval_batch(
@@ -107,10 +134,15 @@ async def run_eval_batch(
             metrics_path.write_text(metrics.model_dump_json(indent=2))
             rec["metrics"] = metrics.model_dump()
 
+            rev_layout = _delivered_revision_layout(
+                config, result["run_name"], delivered
+            )
             judge = await _judge_case(
                 case=case,
                 metrics=metrics,
                 eval_profile=eval_profile,
+                render_sheet=rev_layout.render_sheet,
+                views_dir=rev_layout.views_dir,
             )
             judge_path = case_dir / "judge-output.json"
             judge_path.write_text(judge.model_dump_json(indent=2, by_alias=True))
@@ -139,6 +171,8 @@ async def _judge_case(
     case: EvalCase,
     metrics: DeterministicMetrics,
     eval_profile,
+    render_sheet: Path,
+    views_dir: Path,
 ) -> JudgeOutput:
     judge = build_quality_specialist_judge(eval_profile)
     payload = {
@@ -146,13 +180,21 @@ async def _judge_case(
         "prompt": case.prompt,
         "spec": case.spec,
         "deterministic_metrics": metrics.model_dump(),
-        "render_sheet": "7-view composite (front/back/left/right/top/bottom/iso)",
     }
-    result = await Runner.run(
-        judge,
-        input=(
-            "Judge this delivered CAD revision against ground truth.\n\n"
+    image_paths = _judge_image_paths(
+        reference_image=case.reference_image,
+        render_sheet=render_sheet,
+        views_dir=views_dir,
+    )
+    judge_input = build_multimodal_user_message(
+        text=(
+            "Judge this delivered CAD revision against ground truth. Build the "
+            "feature_checklist before scoring, and use the attached render sheet "
+            "and view PNGs (and the reference image, if attached) as primary "
+            "visual evidence alongside the deterministic metrics.\n\n"
             + json.dumps(payload, indent=2, default=str)
         ),
+        image_paths=image_paths,
     )
+    result = await Runner.run(judge, input=judge_input)
     return result.final_output

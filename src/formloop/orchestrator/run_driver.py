@@ -24,6 +24,7 @@ from ..agents import (
     build_design_researcher,
     build_manager_final,
     build_manager_plan,
+    build_multimodal_user_message,
     build_quality_specialist_review,
 )
 from ..agents.cad_designer import CadRevisionResult
@@ -42,6 +43,7 @@ from ..schemas import (
     RunStatus,
 )
 from ..store import RunStore
+from ..store.layout import RunLayout
 from ..store.run_store import CandidateBundle
 from .narrator import Narrator
 
@@ -72,6 +74,32 @@ def _stage_views(render_out: Path, staging: Path) -> list[Path]:
             dst.write_bytes(src.read_bytes())
             staged.append(dst)
     return staged
+
+
+_REVIEWER_VIEW_ORDER = ("iso", "front", "top", "right", "back", "left", "bottom")
+
+
+def _reviewer_image_paths(
+    *,
+    reference_image: str | None,
+    render_sheet: Path,
+    views_dir: Path,
+) -> list[tuple[str, Path]]:
+    """Ordered (caption, path) pairs for the reviewer's multimodal message.
+
+    Reference image first (when present), then the composite sheet, then the
+    individual views in a sensible detail-first order (iso / front / top /
+    right / back / left / bottom). Missing files are skipped downstream by
+    ``build_multimodal_user_message``.
+    """
+
+    pairs: list[tuple[str, Path]] = []
+    if reference_image:
+        pairs.append(("REFERENCE IMAGE:", Path(reference_image)))
+    pairs.append(("RENDER SHEET (7-view composite):", render_sheet))
+    for name in _REVIEWER_VIEW_ORDER:
+        pairs.append((f"{name.upper()} VIEW:", views_dir / f"{name}.png"))
+    return pairs
 
 
 def _write_inspect_json(run_root: Path, attempt: int, payload: dict | None) -> Path | None:
@@ -625,15 +653,27 @@ class RunDriver:
             "designer_dimensions": cad_out.dimensions,
             "known_risks": cad_out.known_risks,
             "inspect_summary": run_ctx.notes.get("last_inspect"),
-            "render_sheet": "7-view composite (front/back/left/right/top/bottom/iso)",
         }
-        reviewer_run = await Runner.run(
-            reviewer,
-            input=(
-                "Review this revision and produce a ReviewSummary.\n\n"
+        fresh_for_ref = self.store.load_run(run.run_name)
+        rev_layout = RunLayout(
+            runs_root=self.store.runs_root, run_name=run.run_name
+        ).revision(revision.revision_name)
+        image_paths = _reviewer_image_paths(
+            reference_image=fresh_for_ref.reference_image,
+            render_sheet=rev_layout.render_sheet,
+            views_dir=rev_layout.views_dir,
+        )
+        reviewer_input = build_multimodal_user_message(
+            text=(
+                "Review this revision and produce a ReviewSummary. Build the "
+                "feature_checklist before deciding, and use the attached render "
+                "sheet and view PNGs (and the reference image, if attached) as "
+                "primary evidence.\n\n"
                 + json.dumps(payload, indent=2, default=str)
             ),
+            image_paths=image_paths,
         )
+        reviewer_run = await Runner.run(reviewer, input=reviewer_input)
         review: ReviewSummary = reviewer_run.final_output
         fresh = self.store.load_run(run.run_name)
         self.store.attach_review(fresh, revision.revision_name, review)

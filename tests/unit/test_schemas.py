@@ -16,6 +16,10 @@ from formloop.schemas import (
     ArtifactEntry,
     ArtifactManifest,
     AssumptionRecord,
+    ChecklistCategory,
+    ChecklistItem,
+    ChecklistMethod,
+    ChecklistVerdict,
     DeterministicMetrics,
     EffectiveRuntime,
     JudgeOutput,
@@ -80,6 +84,42 @@ def test_review_summary_decision_enum() -> None:
     # Revise requires concrete instructions in practice; schema doesn't enforce
     # but the field defaults to "".
     assert rs.revision_instructions == ""
+    # Feature checklist defaults to empty so legacy persisted runs still load.
+    assert rs.feature_checklist == []
+
+
+def test_review_summary_with_feature_checklist_round_trip() -> None:
+    rs = ReviewSummary(
+        decision=ReviewDecision.revise,
+        confidence=0.6,
+        feature_checklist=[
+            ChecklistItem(
+                feature="plate 40x24x8",
+                category=ChecklistCategory.primitive,
+                expected="40 x 24 x 8 mm plate",
+                observed="roughly 40 x 24 x 8 in all views",
+                method=ChecklistMethod.both,
+                verdict=ChecklistVerdict.pass_,
+            ),
+            ChecklistItem(
+                feature="through_hole x2",
+                category=ChecklistCategory.subtracted,
+                expected="two 6mm through holes 20mm apart on long axis",
+                observed="only one hole visible in top view",
+                method=ChecklistMethod.visual,
+                verdict=ChecklistVerdict.fail,
+                notes="second hole missing",
+            ),
+        ],
+        key_findings=["missing one through hole"],
+        reference_image_notes="reference shows two holes; render shows one",
+        revision_instructions="Add the second 6mm through hole 20mm from the first.",
+    )
+    blob = rs.model_dump_json()
+    restored = ReviewSummary.model_validate_json(blob)
+    assert restored == rs
+    assert len(restored.feature_checklist) == 2
+    assert restored.feature_checklist[1].verdict is ChecklistVerdict.fail
 
 
 def test_progress_event_kinds_cover_lifecycle() -> None:

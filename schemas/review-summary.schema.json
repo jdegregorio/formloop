@@ -1,5 +1,88 @@
 {
   "$defs": {
+    "ChecklistCategory": {
+      "enum": [
+        "primitive",
+        "subtracted",
+        "added",
+        "edge_treatment",
+        "pattern",
+        "thread_gear_spline",
+        "other"
+      ],
+      "title": "ChecklistCategory",
+      "type": "string"
+    },
+    "ChecklistItem": {
+      "additionalProperties": false,
+      "description": "One row of the reviewer's spec-derived feature checklist.\n\nThe reviewer enumerates every feature called out by the spec \u2014 overall\nprimitive + dimensions, subtracted features, added features, edge\ntreatments, patterns, and any thread / gear / spline features \u2014 and\nproduces one ``ChecklistItem`` per feature with a verdict backed by either\nthe rendered views, the inspect summary, or both.",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/ChecklistCategory"
+        },
+        "expected": {
+          "description": "What the spec calls for, in the reviewer's words.",
+          "title": "Expected",
+          "type": "string"
+        },
+        "feature": {
+          "description": "Short label identifying the feature.",
+          "title": "Feature",
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/ChecklistMethod"
+        },
+        "notes": {
+          "default": "",
+          "title": "Notes",
+          "type": "string"
+        },
+        "observed": {
+          "default": "",
+          "description": "What the reviewer actually saw in the renderings or inspect summary.",
+          "title": "Observed",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "verdict": {
+          "$ref": "#/$defs/ChecklistVerdict"
+        }
+      },
+      "required": [
+        "feature",
+        "category",
+        "expected",
+        "method",
+        "verdict"
+      ],
+      "title": "ChecklistItem",
+      "type": "object"
+    },
+    "ChecklistMethod": {
+      "enum": [
+        "visual",
+        "inspect",
+        "both",
+        "unverified"
+      ],
+      "title": "ChecklistMethod",
+      "type": "string"
+    },
+    "ChecklistVerdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "unverified"
+      ],
+      "title": "ChecklistVerdict",
+      "type": "string"
+    },
     "ReviewDecision": {
       "enum": [
         "pass",
@@ -23,6 +106,14 @@
     "decision": {
       "$ref": "#/$defs/ReviewDecision"
     },
+    "feature_checklist": {
+      "description": "One row per spec feature; primary basis for the decision.",
+      "items": {
+        "$ref": "#/$defs/ChecklistItem"
+      },
+      "title": "Feature Checklist",
+      "type": "array"
+    },
     "key_findings": {
       "items": {
         "type": "string"
@@ -40,6 +131,7 @@
         }
       ],
       "default": null,
+      "description": "Narrative comparison of the rendered geometry to the reference image, when one was attached.",
       "title": "Reference Image Notes"
     },
     "revision_instructions": {

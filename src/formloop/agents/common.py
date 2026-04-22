@@ -9,6 +9,7 @@ harness keeps filesystem/identity details out of LLM inputs).
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -94,6 +95,52 @@ class PromptContext:
         return json.dumps(payload, indent=2)
 
 
+_IMAGE_MIME_BY_SUFFIX = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+
+
+def encode_image_data_url(path: Path) -> str:
+    """Base64-encode an image file as a data URL for SDK ``input_image`` parts."""
+
+    mime = _IMAGE_MIME_BY_SUFFIX.get(path.suffix.lower(), "image/png")
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
+
+def build_multimodal_user_message(
+    *,
+    text: str,
+    image_paths: list[tuple[str, Path]],
+) -> list[dict[str, Any]]:
+    """Assemble a Responses-style user message with labeled images + text.
+
+    ``image_paths`` is a list of ``(caption, path)`` tuples. Each attached image
+    is preceded by a short ``input_text`` caption (e.g. ``"REFERENCE IMAGE:"``,
+    ``"RENDER SHEET:"``) so the model knows what it is looking at. Entries whose
+    path does not point at a real file are silently skipped — review should
+    degrade gracefully when a render step failed to produce one of the views.
+    """
+
+    content: list[dict[str, Any]] = [{"type": "input_text", "text": text}]
+    for caption, p in image_paths:
+        if not p.is_file():
+            continue
+        content.append({"type": "input_text", "text": caption})
+        content.append(
+            {
+                "type": "input_image",
+                "detail": "auto",
+                "image_url": encode_image_data_url(p),
+            }
+        )
+    return [{"role": "user", "content": content}]
+
+
 __all__ = [
     "Agent",
     "AgentOutputSchema",
@@ -105,6 +152,8 @@ __all__ = [
     "Runner",
     "WebSearchTool",
     "build_model_settings",
+    "build_multimodal_user_message",
+    "encode_image_data_url",
     "function_tool",
     "lenient_output",
 ]

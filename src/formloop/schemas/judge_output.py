@@ -8,6 +8,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from ._common import SchemaModel
+from .review_summary import ChecklistItem
 
 
 class JudgeOutput(SchemaModel):
@@ -19,6 +20,10 @@ class JudgeOutput(SchemaModel):
     dimension_scores: dict[str, float] = Field(
         default_factory=dict,
         description="Per-dimension 0..1 scores (e.g. geometric_accuracy, feature_presence).",
+    )
+    feature_checklist: list[ChecklistItem] = Field(
+        default_factory=list,
+        description="One row per spec feature; backs the dimension scores.",
     )
     rationale: str
     notes: list[str] = Field(default_factory=list)
