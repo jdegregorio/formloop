@@ -5,8 +5,6 @@ Uses a stub driver + fixture config so the tests don't require OpenAI.
 
 from __future__ import annotations
 
-import asyncio
-import json
 from pathlib import Path
 
 import httpx

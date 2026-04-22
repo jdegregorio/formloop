@@ -7,12 +7,9 @@ from __future__ import annotations
 
 import io
 
-import pytest
-
 from formloop.cli.run_renderer import (
     EventRenderer,
     RendererMode,
-    RendererOptions,
     make_renderer,
 )
 from formloop.schemas import ProgressEvent, ProgressEventKind
