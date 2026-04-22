@@ -132,6 +132,7 @@ def _next_since(events: list[dict], current: int) -> int:
 
 
 _ROLE_PATHS = {
+    "model_py": "model.py",
     "step": "step.step",
     "glb": "model.glb",
     "render_sheet": "render-sheet.png",

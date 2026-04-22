@@ -17,7 +17,7 @@ from pathlib import Path
 from .artifacts import write_artifact
 
 
-def write_model_source(inputs_dir: Path, source: str, filename: str = "model.py") -> Path:
+def write_model_source(dest_dir: Path, source: str, filename: str = "model.py") -> Path:
     """Persist agent-authored build123d source and return its absolute path."""
 
-    return write_artifact(inputs_dir, filename, source)
+    return write_artifact(dest_dir, filename, source)

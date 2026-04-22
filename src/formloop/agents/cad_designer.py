@@ -2,8 +2,10 @@
 
 REQ: FLH-F-003, FLH-D-004, FLH-D-009, FLH-D-020
 
-Writes build123d Python (sandboxed to on-disk ``model.py`` + shelled-out
-``cad build``), renders views, and returns a structured revision bundle.
+Writes build123d Python (sandboxed to on-disk ``model.py`` under the run's
+``_work/source/`` + shelled-out ``cad build``), renders views, and returns a
+structured revision bundle. The ``model.py`` is then versioned into each
+persisted revision folder alongside the build artifacts.
 """
 
 from __future__ import annotations
@@ -87,7 +89,7 @@ Rules:
 def build_cad_designer(profile: Profile) -> Agent[RunContext]:
     @function_tool
     async def write_model(ctx: RunContextWrapper[RunContext], source: str) -> str:
-        """Persist the provided build123d source text to the run's inputs/model.py.
+        """Persist the provided build123d source text to the run's working model.py.
 
         Args:
             source: Full Python source defining ``build_model(params, context)``.
@@ -97,7 +99,7 @@ def build_cad_designer(profile: Profile) -> Agent[RunContext]:
         """
 
         run_ctx = ctx.context
-        path = write_model_source(run_ctx.inputs_dir, source, filename="model.py")
+        path = write_model_source(run_ctx.source_dir, source, filename="model.py")
         # Only surface a non-identifying confirmation back to the model.
         return f"model.py written ({path.stat().st_size} bytes)"
 
@@ -108,7 +110,7 @@ def build_cad_designer(profile: Profile) -> Agent[RunContext]:
         """Run ``cad build`` on the current model.py; returns the build summary."""
 
         run_ctx = ctx.context
-        model_path = run_ctx.inputs_dir / "model.py"
+        model_path = run_ctx.source_dir / "model.py"
         if not model_path.is_file():
             return {"status": "error", "detail": "model.py has not been written yet"}
         try:

@@ -42,7 +42,7 @@ def test_read_missing_raises_file_not_found(tmp_path: Path) -> None:
         read_artifact(tmp_path, "nope.txt")
 
 
-def test_write_model_source_lands_in_inputs(tmp_path: Path) -> None:
+def test_write_model_source_writes_file(tmp_path: Path) -> None:
     source = "def build_model(params, context):\n    return None\n"
     p = write_model_source(tmp_path, source)
     assert p.name == "model.py"

@@ -32,6 +32,10 @@ class RevisionLayout:
         return self.root / "model.glb"
 
     @property
+    def model_py(self) -> Path:
+        return self.root / "model.py"
+
+    @property
     def render_sheet(self) -> Path:
         return self.root / "render-sheet.png"
 
@@ -84,10 +88,6 @@ class RunLayout:
         return self.root / "snapshot.json"
 
     @property
-    def inputs_dir(self) -> Path:
-        return self.root / "inputs"
-
-    @property
     def revisions_dir(self) -> Path:
         return self.root / "revisions"
 
@@ -96,5 +96,4 @@ class RunLayout:
 
     def ensure(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
-        self.inputs_dir.mkdir(parents=True, exist_ok=True)
         self.revisions_dir.mkdir(parents=True, exist_ok=True)

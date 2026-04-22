@@ -197,10 +197,12 @@ class RunDriver:
         )
         run.status = RunStatus.running
         self.store.save_run(run)
+        source_dir = layout.root / "_work" / "source"
+        source_dir.mkdir(parents=True, exist_ok=True)
         run_ctx = RunContext(
             run_name=run.run_name,
             run_root=layout.root,
-            inputs_dir=layout.inputs_dir,
+            source_dir=source_dir,
             profile=profile,
         )
         return run, run_ctx, profile, max_revisions
@@ -546,6 +548,7 @@ class RunDriver:
                 spec_snapshot=dict(plan.normalized_spec),
                 designer_notes=cad_out.revision_notes,
                 known_risks=list(cad_out.known_risks),
+                model_py_src=run_ctx.source_dir / "model.py",
                 step_src=build_dir / "model.step",
                 glb_src=build_dir / "model.glb",
                 views_dir_src=staging,
