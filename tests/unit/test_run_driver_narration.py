@@ -89,7 +89,6 @@ def _install_runner_stub(monkeypatch) -> None:
         if name == "cad_designer":
             return _FakeResult(
                 final_output=CadRevisionResult(
-                    model_py_written=False,
                     build_ok=False,
                     inspect_ok=False,
                     render_ok=False,

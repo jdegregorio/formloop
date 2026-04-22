@@ -22,8 +22,6 @@ Design notes:
 
 from __future__ import annotations
 
-import os
-import shutil
 import sys
 import textwrap
 from dataclasses import dataclass
@@ -31,6 +29,16 @@ from enum import Enum
 from typing import IO
 
 from ..schemas import ProgressEvent, ProgressEventKind
+from ._ansi import (
+    BOLD,
+    DIM,
+    GREEN,
+    RED,
+    RESET,
+    YELLOW,
+    supports_ansi,
+    terminal_width,
+)
 
 
 class RendererMode(str, Enum):
@@ -66,37 +74,10 @@ _VERBOSE_VISIBLE_KINDS: frozenset[ProgressEventKind] = frozenset(
     }
 )
 
-# ANSI helpers — stdlib only, kept tiny on purpose (FLH-NF-008).
-_RESET = "\x1b[0m"
-_DIM = "\x1b[2m"
-_BOLD = "\x1b[1m"
-_RED = "\x1b[31m"
-_GREEN = "\x1b[32m"
-_YELLOW = "\x1b[33m"
-_CYAN = "\x1b[36m"
-
 NARRATION_MARKER = "›"
 MILESTONE_MARKER = "·"
 ASSUMPTION_MARKER = "↳"
 FAILURE_MARKER = "✗"
-
-
-def _supports_ansi(stream: IO[str]) -> bool:
-    if os.environ.get("NO_COLOR"):
-        return False
-    if not hasattr(stream, "isatty"):
-        return False
-    try:
-        return bool(stream.isatty())
-    except Exception:
-        return False
-
-
-def _terminal_width(default: int = 100) -> int:
-    try:
-        return max(40, shutil.get_terminal_size((default, 24)).columns)
-    except Exception:
-        return default
 
 
 def _format_value(value: object) -> str:
@@ -168,7 +149,7 @@ class EventRenderer:
         self.stream = stream if stream is not None else sys.stdout
         self.options = options or RendererOptions()
         # Decide effective mode — rich requires both a TTY and color enabled.
-        if not _supports_ansi(self.stream) or not self.options.color:
+        if not supports_ansi(self.stream) or not self.options.color:
             if self.options.mode is RendererMode.rich:
                 self.options.mode = RendererMode.plain
         self._last_phase: str | None = None
@@ -187,17 +168,11 @@ class EventRenderer:
             # Never let a renderer failure abort the run.
             pass
 
-    def finalize(self) -> None:
-        """Call once when the run finishes. No cursor cleanup needed in
-        append-only mode, but kept on the public API for callers."""
-
-        return None
-
     # ---- internals -----------------------------------------------------
 
     def _color(self, ansi: str, text: str) -> str:
         if self.options.color and self.options.mode is RendererMode.rich:
-            return f"{ansi}{text}{_RESET}"
+            return f"{ansi}{text}{RESET}"
         return text
 
     def _print(self, line: str) -> None:
@@ -239,7 +214,7 @@ class EventRenderer:
         text = (event.message or "").strip()
         if not text:
             return
-        width = _terminal_width()
+        width = terminal_width()
         phase = event.phase or "…"
         phase_tag = f"[{phase}]"
         # First-line prefix shows phase + marker so readers can scan the
@@ -249,7 +224,7 @@ class EventRenderer:
         # same column and look visually consistent.
         visible_prefix = f"  {NARRATION_MARKER} {phase_tag} "
         visible_prefix_len = len(visible_prefix)
-        colored_prefix = f"  {NARRATION_MARKER} {self._color(_DIM, phase_tag)} "
+        colored_prefix = f"  {NARRATION_MARKER} {self._color(DIM, phase_tag)} "
         subsequent_indent = "    "  # 4 spaces — constant across phases
         # Use textwrap with initial_indent as padding-sized spaces so the
         # wrap algorithm budgets width correctly for the first line; we
@@ -269,7 +244,7 @@ class EventRenderer:
         if wrapped.startswith(initial_spaces):
             wrapped = colored_prefix + wrapped[len(initial_spaces):]
         first, sep, rest = wrapped.partition("\n")
-        line = self._color(_BOLD, first)
+        line = self._color(BOLD, first)
         if rest:
             line = line + sep + rest
         self._print(line)
@@ -285,7 +260,7 @@ class EventRenderer:
         """Render a structured milestone event with kind-specific polish."""
 
         kind = event.kind
-        width = _terminal_width()
+        width = terminal_width()
 
         if kind is ProgressEventKind.spec_normalized:
             self._render_spec_normalized(event, width=width)
@@ -357,13 +332,13 @@ class EventRenderer:
             if isinstance(confidence, (int, float)):
                 text += f" (confidence {confidence:.2f})"
             decorated = (
-                self._color(_GREEN, text)
+                self._color(GREEN, text)
                 if decision == "pass"
-                else self._color(_YELLOW, text)
+                else self._color(YELLOW, text)
             )
             # Render manually so we keep the milestone marker but use a
             # decision-colored body instead of the default dim treatment.
-            self._print(f"  {self._color(_DIM, MILESTONE_MARKER)} {decorated}")
+            self._print(f"  {self._color(DIM, MILESTONE_MARKER)} {decorated}")
             return
         if kind is ProgressEventKind.delivered:
             rev = event.data.get("revision")
@@ -374,11 +349,11 @@ class EventRenderer:
             if status:
                 text += f" ({status})"
             decorated = (
-                self._color(_GREEN, text)
+                self._color(GREEN, text)
                 if status == "succeeded"
-                else self._color(_YELLOW, text)
+                else self._color(YELLOW, text)
             )
-            self._print(f"  {self._color(_DIM, MILESTONE_MARKER)} {decorated}")
+            self._print(f"  {self._color(DIM, MILESTONE_MARKER)} {decorated}")
             return
 
         # Fallback: just print the message dimly.
@@ -393,9 +368,9 @@ class EventRenderer:
             subsequent_indent=" " * len(prefix),
         )
         first, _, rest = body.partition("\n")
-        line = self._color(_DIM, prefix + first)
+        line = self._color(DIM, prefix + first)
         if rest:
-            line += "\n" + self._color(_DIM, rest)
+            line += "\n" + self._color(DIM, rest)
         self._print(line)
 
     def _render_indent_line(self, text: str, *, width: int) -> None:
@@ -403,7 +378,7 @@ class EventRenderer:
         wrapped = _wrap(
             text, width=width, initial_indent=prefix, subsequent_indent=prefix + "  "
         )
-        self._print(self._color(_DIM, wrapped))
+        self._print(self._color(DIM, wrapped))
 
     def _render_spec_normalized(self, event: ProgressEvent, *, width: int) -> None:
         data = event.data
@@ -437,14 +412,14 @@ class EventRenderer:
         wrapped = _wrap(
             text, width=width, initial_indent=prefix, subsequent_indent=prefix + "  "
         )
-        self._print(self._color(_DIM, wrapped))
+        self._print(self._color(DIM, wrapped))
 
     # ---- failure / verbose ---------------------------------------------
 
     def _render_failure(self, event: ProgressEvent) -> None:
         text = f"{FAILURE_MARKER} {event.message or 'run failed'}"
         if self.options.color and self.options.mode is RendererMode.rich:
-            self._print(_BOLD + _RED + text + _RESET)
+            self._print(BOLD + RED + text + RESET)
         else:
             self._print(text)
 
@@ -461,17 +436,17 @@ class EventRenderer:
         ]
         if not items:
             idx = f"idx={event.index:03d}"
-            self._print(self._color(_DIM, f"      [{idx}]"))
+            self._print(self._color(DIM, f"      [{idx}]"))
             return
         payload = f"      [idx={event.index:03d}] " + ", ".join(items)
-        width = _terminal_width()
+        width = terminal_width()
         if len(payload) <= width:
-            self._print(self._color(_DIM, payload))
+            self._print(self._color(DIM, payload))
             return
         # Long payload: one key=value per line.
-        self._print(self._color(_DIM, f"      [idx={event.index:03d}]"))
+        self._print(self._color(DIM, f"      [idx={event.index:03d}]"))
         for item in items:
-            self._print(self._color(_DIM, f"        {item}"))
+            self._print(self._color(DIM, f"        {item}"))
 
 
 def make_renderer(

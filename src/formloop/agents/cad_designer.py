@@ -38,7 +38,6 @@ from .common import (
 class CadRevisionResult(BaseModel):
     """Structured output from a CAD Designer turn."""
 
-    model_py_written: bool = Field(description="True if the designer persisted model.py.")
     build_ok: bool
     inspect_ok: bool
     render_ok: bool

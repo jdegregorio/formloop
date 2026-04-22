@@ -12,7 +12,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -104,13 +104,6 @@ class CadCompareResult(_CadResult):
     artifacts: list[dict[str, Any]] = Field(default_factory=list)
 
 
-class CadPackageResult(_CadResult):
-    bundle_path: str
-    manifest_path: str
-    inputs: dict[str, Any] = Field(default_factory=dict)
-    entries: list[dict[str, Any]] = Field(default_factory=list)
-
-
 # ---------------------------------------------------------------------------
 # Tool discovery.
 # ---------------------------------------------------------------------------
@@ -171,11 +164,7 @@ def cad_build(
     *,
     model_path: Path,
     output_dir: Path,
-    params_path: Path | None = None,
     overrides: dict[str, Any] | None = None,
-    callable_name: str | None = None,
-    emit_stl: bool = False,
-    snapshot_source: bool = False,
     timeout: float | None = None,
 ) -> CadBuildResult:
     """Invoke ``cad build`` and return the parsed result."""
@@ -189,15 +178,7 @@ def cad_build(
         "--format",
         "json",
     ]
-    if params_path is not None:
-        cmd += ["--params", str(params_path)]
     cmd += _format_overrides(overrides)
-    if callable_name:
-        cmd += ["--callable", callable_name]
-    if emit_stl:
-        cmd += ["--emit-stl"]
-    if snapshot_source:
-        cmd += ["--snapshot-source"]
     result = run_cli(cmd, timeout=timeout)
     payload = result.parse_json()
     return CadBuildResult.model_validate(payload)
@@ -254,24 +235,6 @@ def cad_inspect_summary(
     return _cad_inspect("summary", artifact_path, timeout=timeout)
 
 
-def cad_inspect_bbox(
-    artifact_path: Path, *, timeout: float | None = None
-) -> CadInspectResult:
-    return _cad_inspect("bbox", artifact_path, timeout=timeout)
-
-
-def cad_inspect_volume(
-    artifact_path: Path, *, timeout: float | None = None
-) -> CadInspectResult:
-    return _cad_inspect("volume", artifact_path, timeout=timeout)
-
-
-def cad_inspect_holes(
-    artifact_path: Path, *, timeout: float | None = None
-) -> CadInspectResult:
-    return _cad_inspect("holes", artifact_path, timeout=timeout)
-
-
 def cad_compare(
     *,
     left_path: Path,
@@ -308,31 +271,3 @@ def cad_compare(
     return CadCompareResult.model_validate(payload)
 
 
-def cad_package(
-    *,
-    output_path: Path,
-    build_dir: Path | None = None,
-    render_dir: Path | None = None,
-    compare_dir: Path | None = None,
-    includes: Sequence[Path] = (),
-    timeout: float | None = None,
-) -> CadPackageResult:
-    cmd: list[str] = [
-        locate_cad(),
-        "package",
-        "--output",
-        str(output_path),
-        "--format",
-        "json",
-    ]
-    if build_dir is not None:
-        cmd += ["--build-dir", str(build_dir)]
-    if render_dir is not None:
-        cmd += ["--render-dir", str(render_dir)]
-    if compare_dir is not None:
-        cmd += ["--compare-dir", str(compare_dir)]
-    for p in includes:
-        cmd += ["--include", str(p)]
-    result = run_cli(cmd, timeout=timeout)
-    payload = result.parse_json()
-    return CadPackageResult.model_validate(payload)

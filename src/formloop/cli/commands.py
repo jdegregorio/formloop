@@ -134,7 +134,6 @@ def run_cmd(
             event_hook=renderer,
         )
     )
-    renderer.finalize()
 
     if not quiet:
         print_run_footer(
