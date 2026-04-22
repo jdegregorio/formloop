@@ -8,46 +8,20 @@ the live event renderer so the renderer stays focused on streaming events.
 
 from __future__ import annotations
 
-import os
-import shutil
 import sys
 import textwrap
 from pathlib import Path
 from typing import IO
 
-_RESET = "\x1b[0m"
-_DIM = "\x1b[2m"
-_BOLD = "\x1b[1m"
-_GREEN = "\x1b[32m"
-_RED = "\x1b[31m"
-_CYAN = "\x1b[36m"
-_YELLOW = "\x1b[33m"
-
-
-def _supports_ansi(stream: IO[str]) -> bool:
-    if os.environ.get("NO_COLOR"):
-        return False
-    if not hasattr(stream, "isatty"):
-        return False
-    try:
-        return bool(stream.isatty())
-    except Exception:
-        return False
-
-
-def _terminal_width(default: int = 100) -> int:
-    try:
-        return max(60, min(120, shutil.get_terminal_size((default, 24)).columns))
-    except Exception:
-        return default
+from ._ansi import BOLD, DIM, GREEN, RED, RESET, supports_ansi, terminal_width
 
 
 def _color(text: str, ansi: str, *, enabled: bool) -> str:
-    return f"{ansi}{text}{_RESET}" if enabled else text
+    return f"{ansi}{text}{RESET}" if enabled else text
 
 
 def _rule(width: int, *, enabled: bool) -> str:
-    return _color("─" * width, _DIM, enabled=enabled)
+    return _color("─" * width, DIM, enabled=enabled)
 
 
 def _wrap_indented(text: str, width: int, indent: str = "  ") -> list[str]:
@@ -85,25 +59,25 @@ def print_run_header(
     """Print the boxed run header before orchestration starts."""
 
     out = stream if stream is not None else sys.stdout
-    enabled = color and _supports_ansi(out)
-    width = _terminal_width()
+    enabled = color and supports_ansi(out)
+    width = terminal_width(min_width=60, max_width=120)
     rule = _rule(width, enabled=enabled)
-    title = _color("formloop run", _BOLD, enabled=enabled)
+    title = _color("formloop run", BOLD, enabled=enabled)
     meta = _color(
-        f"profile={profile_name}  model={model}", _DIM, enabled=enabled
+        f"profile={profile_name}  model={model}", DIM, enabled=enabled
     )
 
     out.write(rule + "\n")
     out.write(f" {title}   {meta}\n")
     out.write(rule + "\n")
-    out.write(_color("  Request:", _BOLD, enabled=enabled) + "\n")
+    out.write(_color("  Request:", BOLD, enabled=enabled) + "\n")
     for line in _wrap_indented(prompt, width=width - 4, indent="    "):
         out.write(line + "\n")
     if reference_image:
         out.write(
             _color(
                 f"  Reference image: {Path(reference_image).name}",
-                _DIM,
+                DIM,
                 enabled=enabled,
             )
             + "\n"
@@ -125,38 +99,38 @@ def print_run_footer(
     """Print the boxed run footer after orchestration completes."""
 
     out = stream if stream is not None else sys.stdout
-    enabled = color and _supports_ansi(out)
-    width = _terminal_width()
+    enabled = color and supports_ansi(out)
+    width = terminal_width(min_width=60, max_width=120)
     rule = _rule(width, enabled=enabled)
 
     out.write("\n")
     out.write(rule + "\n")
-    badge_color = _GREEN if status == "succeeded" else _RED
+    badge_color = GREEN if status == "succeeded" else RED
     badge = _color(
         f"{'✓' if status == 'succeeded' else '✗'} {status}",
-        f"{_BOLD}{badge_color}",
+        f"{BOLD}{badge_color}",
         enabled=enabled,
     )
-    head = _color(f"Run {run_name}", _BOLD, enabled=enabled)
+    head = _color(f"Run {run_name}", BOLD, enabled=enabled)
     out.write(f" {badge}   {head}\n")
     out.write(rule + "\n")
 
     if delivered_revision:
         out.write(
-            _color("  Delivered revision: ", _BOLD, enabled=enabled)
+            _color("  Delivered revision: ", BOLD, enabled=enabled)
             + delivered_revision
             + "\n"
         )
     if artifacts_dir is not None:
         out.write(
-            _color("  Artifacts:          ", _BOLD, enabled=enabled)
+            _color("  Artifacts:          ", BOLD, enabled=enabled)
             + str(artifacts_dir)
             + "\n"
         )
 
     if final_answer:
         out.write("\n")
-        out.write(_color("  Summary", _BOLD, enabled=enabled) + "\n")
+        out.write(_color("  Summary", BOLD, enabled=enabled) + "\n")
         for line in _wrap_indented(final_answer, width=width - 4, indent="    "):
             out.write(line + "\n")
     out.write("\n")

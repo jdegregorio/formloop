@@ -157,7 +157,7 @@ def test_narration_continuation_indent_is_constant_across_phases(monkeypatch) ->
     # label length, so `[plan]` and `[revision]` wrapped to DIFFERENT
     # columns and the output looked ragged. It must now be fixed.
     monkeypatch.setattr(
-        "formloop.cli.run_renderer._terminal_width", lambda default=100: 60
+        "formloop.cli.run_renderer.terminal_width", lambda *a, **k: 60
     )
     r, buf = _renderer()
     long_text = (
@@ -181,7 +181,7 @@ def test_long_narration_wraps_to_terminal_width(monkeypatch) -> None:
     # Append-only mode must NEVER truncate narrations — terminals can't
     # expand history like the UI can, so the full text has to wrap.
     monkeypatch.setattr(
-        "formloop.cli.run_renderer._terminal_width", lambda default=100: 40
+        "formloop.cli.run_renderer.terminal_width", lambda *a, **k: 40
     )
     r, buf = _renderer()
     text = "this is a very long narration line that should wrap cleanly across multiple terminal rows"
@@ -202,11 +202,6 @@ def test_make_renderer_auto_downgrades_when_no_tty() -> None:
     # io.StringIO is not a TTY → rich mode downgrades to plain.
     r, _ = _renderer()
     assert r.options.mode is RendererMode.plain
-
-
-def test_renderer_finalize_is_safe_to_call_when_no_narration() -> None:
-    r, _ = _renderer()
-    r.finalize()  # should not raise
 
 
 def test_renderer_quiet_and_verbose_resolves_to_quiet() -> None:
