@@ -60,6 +60,14 @@ def run_cmd(
         str | None,
         typer.Option("--profile", help="Profile name from formloop.harness.toml."),
     ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Override the model (e.g. gpt-5.4-nano)."),
+    ] = None,
+    effort: Annotated[
+        str | None,
+        typer.Option("--effort", help="Override reasoning effort: low | medium | high."),
+    ] = None,
     reference_image: Annotated[
         Path | None,
         typer.Option("--reference-image", help="Optional reference image path."),
@@ -109,7 +117,7 @@ def run_cmd(
         print_run_header(
             prompt=prompt,
             profile_name=resolved_profile.name,
-            model=resolved_profile.model,
+            model=model or resolved_profile.model,
             reference_image=ref,
             color=not no_color,
         )
@@ -119,6 +127,8 @@ def run_cmd(
             prompt,
             config=config,
             profile=profile,
+            model=model,
+            effort=effort,
             reference_image=ref,
             max_revisions=max_revisions,
             event_hook=renderer,
@@ -239,6 +249,8 @@ def update_cmd() -> None:
 def eval_run_cmd(
     dataset_path: Annotated[Path, typer.Argument(help="Path to cases.jsonl.")],
     profile: Annotated[str | None, typer.Option("--profile")] = None,
+    model: Annotated[str | None, typer.Option("--model", help="Override the model (e.g. gpt-5.4-nano).")] = None,
+    effort: Annotated[str | None, typer.Option("--effort", help="Override reasoning effort: low | medium | high.")] = None,
     batch_name: Annotated[str | None, typer.Option("--batch-name")] = None,
     max_revisions: Annotated[int | None, typer.Option("--max-revisions")] = None,
 ) -> None:
@@ -252,6 +264,8 @@ def eval_run_cmd(
             dataset_path=dataset_path,
             config=config,
             profile=profile,
+            model=model,
+            effort=effort,
             batch_name=batch_name,
             max_revisions=max_revisions,
         )

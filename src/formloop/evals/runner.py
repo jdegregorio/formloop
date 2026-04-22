@@ -30,6 +30,8 @@ async def run_eval_batch(
     dataset_path: Path,
     config: HarnessConfig,
     profile: str | None = None,
+    model: str | None = None,
+    effort: str | None = None,
     batch_name: str | None = None,
     max_revisions: int | None = None,
 ) -> Path:
@@ -63,6 +65,8 @@ async def run_eval_batch(
             DriveRequest(
                 prompt=case.prompt,
                 profile_name=profile,
+                model_override=model,
+                reasoning_override=effort,
                 reference_image=str(case.reference_image)
                 if case.reference_image
                 else None,

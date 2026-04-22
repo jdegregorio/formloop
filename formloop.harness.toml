@@ -22,7 +22,7 @@ agent_run = 600
 # Profiles (FLH-D-017). Each maps to an OpenAI model + reasoning level.
 [profiles.normal]
 model = "gpt-5.4"
-reasoning = "high"
+reasoning = "medium"
 description = "Normal user-facing execution and eval execution."
 
 [profiles.dev_test]
