@@ -11,7 +11,7 @@ from ._common import SchemaModel
 
 
 class JudgeOutput(SchemaModel):
-    """Quality Specialist judgment in eval mode."""
+    """Judge specialist output in developer eval mode."""
 
     case_id: str
     overall_score: float = Field(ge=0.0, le=1.0)

@@ -2,7 +2,7 @@
   "$id": "formloop/judge-output",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Quality Specialist judgment in eval mode.",
+  "description": "Judge specialist output in developer eval mode.",
   "properties": {
     "case_id": {
       "title": "Case Id",

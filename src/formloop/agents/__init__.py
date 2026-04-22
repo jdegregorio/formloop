@@ -23,10 +23,8 @@ from .narrator import (
     NarrationOutput,
     build_narrator,
 )
-from .quality_specialist import (
-    build_quality_specialist_judge,
-    build_quality_specialist_review,
-)
+from .judge import build_judge
+from .reviewer import build_reviewer
 
 __all__ = [
     "AssumptionProposal",
@@ -46,6 +44,6 @@ __all__ = [
     "build_manager_final",
     "build_manager_plan",
     "build_narrator",
-    "build_quality_specialist_judge",
-    "build_quality_specialist_review",
+    "build_judge",
+    "build_reviewer",
 ]

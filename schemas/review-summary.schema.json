@@ -30,6 +30,15 @@
       "title": "Key Findings",
       "type": "array"
     },
+    "feature_checklist": {
+      "description": "Flexible per-feature review checklist entries. Keep structure light-weight.",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Feature Checklist",
+      "type": "array"
+    },
     "reference_image_notes": {
       "anyOf": [
         {
