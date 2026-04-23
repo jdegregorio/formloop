@@ -24,6 +24,7 @@ from .cad_cli import (
     locate_cad,
 )
 from .constrained_python import write_model_source
+from .multimodal import image_file_to_input_image, text_and_image_list_to_sdk_message_payload
 from .subprocess import CliError, CliResult, run_cli
 
 __all__ = [
@@ -39,7 +40,9 @@ __all__ = [
     "cad_render",
     "locate_blender",
     "locate_cad",
+    "image_file_to_input_image",
     "read_artifact",
+    "text_and_image_list_to_sdk_message_payload",
     "run_cli",
     "write_artifact",
     "write_model_source",

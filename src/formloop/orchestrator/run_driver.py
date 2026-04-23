@@ -42,6 +42,7 @@ from ..schemas import (
     RunStatus,
 )
 from ..store import RunStore
+from ..runtime.multimodal import text_and_image_list_to_sdk_message_payload
 from ..store.run_store import CandidateBundle
 from .narrator import Narrator
 
@@ -91,8 +92,6 @@ def _write_inspect_json(run_root: Path, attempt: int, payload: dict | None) -> P
 
 
 import re as _re
-import base64
-import mimetypes
 
 _FORBIDDEN_PATTERNS = (
     _re.compile(r"run-\d+"),
@@ -174,29 +173,6 @@ def _read_source_excerpt(path: Path, *, max_chars: int = 20000) -> str:
         return text
     return text[:max_chars] + "\n\n# [truncated]"
 
-
-def _image_input_item(path: Path) -> dict[str, str] | None:
-    if not path.is_file():
-        return None
-    mime, _ = mimetypes.guess_type(path.name)
-    mime = mime or "image/png"
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-    return {"type": "input_image", "image_url": f"data:{mime};base64,{encoded}"}
-
-
-def _multimodal_payload(text_payload: dict[str, Any], image_paths: list[Path]) -> list[dict[str, Any]]:
-    content: list[dict[str, Any]] = [
-        {
-            "type": "input_text",
-            "text": "Review this revision and produce a ReviewSummary.\n\n"
-            + json.dumps(text_payload, indent=2, default=str),
-        }
-    ]
-    for path in image_paths:
-        image_item = _image_input_item(path)
-        if image_item:
-            content.append(image_item)
-    return [{"role": "user", "content": content}]
 
 
 class RunDriver:
@@ -673,7 +649,11 @@ class RunDriver:
             image_paths.append(Path(run.reference_image))
         reviewer_run = await Runner.run(
             reviewer,
-            input=_multimodal_payload(payload, image_paths),
+            input=text_and_image_list_to_sdk_message_payload([
+                "Review this revision and produce a ReviewSummary.\n\n"
+                + json.dumps(payload, indent=2, default=str),
+                *image_paths,
+            ]),
         )
         review: ReviewSummary = reviewer_run.final_output
         fresh = self.store.load_run(run.run_name)

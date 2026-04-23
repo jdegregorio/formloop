@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import base64
-import mimetypes
 from datetime import datetime
 from pathlib import Path
 
@@ -13,32 +11,10 @@ from ..config.profiles import HarnessConfig
 from ..orchestrator import RunDriver
 from ..orchestrator.run_driver import DriveRequest
 from ..runtime.cad_cli import cad_compare
+from ..runtime.multimodal import text_and_image_list_to_sdk_message_payload
 from ..schemas import DeterministicMetrics, JudgeOutput
 from .dataset import EvalCase, load_cases
 
-
-def _image_input_item(path: Path) -> dict[str, str] | None:
-    if not path.is_file():
-        return None
-    mime, _ = mimetypes.guess_type(path.name)
-    mime = mime or "image/png"
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-    return {"type": "input_image", "image_url": f"data:{mime};base64,{encoded}"}
-
-
-def _multimodal_payload(text_payload: dict, image_paths: list[Path]) -> list[dict]:
-    content: list[dict] = [
-        {
-            "type": "input_text",
-            "text": "Judge this delivered CAD revision against ground truth.\n\n"
-            + json.dumps(text_payload, indent=2, default=str),
-        }
-    ]
-    for path in image_paths:
-        image_item = _image_input_item(path)
-        if image_item:
-            content.append(image_item)
-    return [{"role": "user", "content": content}]
 
 
 def _batch_dir(config: HarnessConfig, batch_name: str) -> Path:
@@ -189,6 +165,10 @@ async def _judge_case(
         images.append(case.reference_image)
     result = await Runner.run(
         judge,
-        input=_multimodal_payload(payload, images),
+        input=text_and_image_list_to_sdk_message_payload([
+            "Judge this delivered CAD revision against ground truth.\n\n"
+            + json.dumps(payload, indent=2, default=str),
+            *images,
+        ]),
     )
     return result.final_output
