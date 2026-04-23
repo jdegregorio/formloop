@@ -33,3 +33,19 @@ uv run formloop run "a 20mm cube" --profile dev_test
 ```
 
 Run artifacts land under `var/runs/run-NNNN/`.
+
+## Build123D part-library support in CAD generation
+
+The CAD Designer instructions and research workflow are wired to prefer
+Build123D-native approaches plus these installed helper libraries when
+appropriate:
+
+- `bd_warehouse`
+- `bd_beams_and_bars`
+- `bd_vslot`
+- `py_gearworks`
+
+During planning/research, manager-generated research topics may include both
+engineering/standards questions and Build123D implementation-method questions
+(for example: "how to model this feature in Build123D using the installed
+libraries").

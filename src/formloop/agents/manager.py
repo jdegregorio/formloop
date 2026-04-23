@@ -32,8 +32,9 @@ class ManagerPlan(BaseModel):
     research_topics: list[str] = Field(
         default_factory=list,
         description=(
-            "Narrow, single-answer research questions. Empty if no external "
-            "references are needed (FLH-F-016, FLH-F-018)."
+            "Focused research queries. These can cover external engineering facts "
+            "and/or Build123D implementation methods when modeling strategy is "
+            "non-obvious (FLH-F-016, FLH-F-018)."
         ),
     )
     design_brief: str = Field(
@@ -63,9 +64,13 @@ Rules:
 - If the user under-specifies a value (e.g. "a plate with holes" with no hole
   count), pick a sensible minimum and record it as an assumption. Prefer simple
   round values.
-- ``research_topics`` should be EMPTY when the spec is self-contained. Include a
-  topic only when an external fact (a standard, a material property, a
-  manufacturing norm) is needed for a defensible design.
+- ``research_topics`` should be EMPTY only when the spec is fully self-contained
+  and the CAD implementation approach is straightforward.
+- Include research topics for BOTH:
+  1) external facts (standards, material properties, manufacturing norms), and
+  2) Build123D modeling-method questions (e.g. "how to build X feature with
+     Build123D and available helper libraries").
+- You do not need to classify topic types. A single mixed list is expected.
 - ``design_brief`` is 2-4 sentences: the shape, its key dimensions, and which
   features matter most.
 - Do not write CAD code or reference filesystem identifiers here."""

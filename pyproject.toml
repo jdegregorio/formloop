@@ -17,6 +17,10 @@ dependencies = [
   "python-dotenv>=1.0.0,<2.0.0",
   "httpx>=0.27.0,<1.0.0",
   "cad-cli",
+  "bd_warehouse @ git+https://github.com/gumyr/bd_warehouse.git",
+  "bd_beams_and_bars @ git+https://gitlab.com/experimentslabs/3d/bd_beams_and_bars.git",
+  "bd_vslot @ git+https://github.com/gumyr/bd_vslot.git",
+  "py_gearworks @ git+https://github.com/GarryBGoode/py_gearworks.git",
 ]
 
 [project.optional-dependencies]

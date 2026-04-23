@@ -61,6 +61,10 @@ def test_cad_designer_registers_four_tools(profile: Profile) -> None:
     # Four tools: write_model, build_model_cli, inspect_model, render_model.
     tool_names = {getattr(t, "name", t.__class__.__name__) for t in agent.tools}
     assert {"write_model", "build_model_cli", "inspect_model", "render_model"} <= tool_names
+    assert "bd_warehouse" in agent.instructions
+    assert "bd_beams_and_bars" in agent.instructions
+    assert "bd_vslot" in agent.instructions
+    assert "py_gearworks" in agent.instructions
 
 
 def test_reviewer_and_judge_modes(profile: Profile) -> None:
