@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import base64
-import json
-import mimetypes
 from pathlib import Path
 from typing import Any
 
+from ..sdk_messages import build_single_user_multimodal_message
 from ..schemas import ProgressEventKind, ReviewDecision
 from .narration import fallback_review
 from .phase_context import OrchestrationPhaseContext, PhaseRuntimeContext
@@ -19,29 +17,6 @@ def _read_source_excerpt(path: Path, *, max_chars: int = 20000) -> str:
         return text
     return text[:max_chars] + "\n\n# [truncated]"
 
-
-def _image_input_item(path: Path) -> dict[str, str] | None:
-    if not path.is_file():
-        return None
-    mime, _ = mimetypes.guess_type(path.name)
-    mime = mime or "image/png"
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-    return {"type": "input_image", "image_url": f"data:{mime};base64,{encoded}"}
-
-
-def _multimodal_payload(text_payload: dict[str, Any], image_paths: list[Path]) -> list[dict[str, Any]]:
-    content: list[dict[str, Any]] = [
-        {
-            "type": "input_text",
-            "text": "Review this revision and produce a ReviewSummary.\n\n"
-            + json.dumps(text_payload, indent=2, default=str),
-        }
-    ]
-    for path in image_paths:
-        image_item = _image_input_item(path)
-        if image_item:
-            content.append(image_item)
-    return [{"role": "user", "content": content}]
 
 
 async def review_phase(
@@ -75,7 +50,14 @@ async def review_phase(
     image_paths = [sheet_path]
     if run.reference_image:
         image_paths.append(Path(run.reference_image))
-    review = await ctx.review_revision(_multimodal_payload(payload, image_paths), runtime.profile)
+    review = await ctx.review_revision(
+        build_single_user_multimodal_message(
+            lead_text="Review this revision and produce a ReviewSummary.",
+            payload=payload,
+            image_paths=image_paths,
+        ),
+        runtime.profile,
+    )
     fresh = ctx.load_run(run.run_name)
     ctx.attach_review(fresh, revision.revision_name, review)
     ctx.emit(
