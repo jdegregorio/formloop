@@ -80,7 +80,6 @@ def test_create_run_allocates_sequential_name(
     assert layout_a.run_json.is_file()
     assert layout_a.events_jsonl.is_file()
     assert layout_a.snapshot_json.is_file()
-    # First event recorded at creation.
     events = store.read_events(run_a.run_name)
     assert len(events) == 1
     assert events[0].kind == ProgressEventKind.run_created
@@ -103,6 +102,37 @@ def test_append_event_auto_indexes(
     assert indices == [0, 1, 2]
 
 
+def test_append_event_auto_indexes_with_empty_events_file(
+    store: RunStore, effective_runtime: EffectiveRuntime
+) -> None:
+    run, layout = store.create_run(input_summary="x", effective_runtime=effective_runtime)
+    layout.events_jsonl.write_text("")
+
+    assigned = store.append_event(
+        run.run_name,
+        ProgressEvent(index=0, kind=ProgressEventKind.breadcrumb, message="after-empty"),
+    )
+
+    assert assigned.index == 0
+    events = store.read_events(run.run_name)
+    assert [e.index for e in events] == [0]
+
+
+def test_append_event_auto_indexes_with_truncated_last_line(
+    store: RunStore, effective_runtime: EffectiveRuntime
+) -> None:
+    run, layout = store.create_run(input_summary="x", effective_runtime=effective_runtime)
+    layout.events_jsonl.write_text('{"index":0,"kind":"run_created","message":"run"}\n{"index":1')
+
+    assigned = store.append_event(
+        run.run_name,
+        ProgressEvent(index=0, kind=ProgressEventKind.breadcrumb, message="recover"),
+    )
+
+    assert assigned.index == 2
+    assert json.loads(layout.events_jsonl.read_text().splitlines()[-1])["index"] == 2
+
+
 def test_read_events_since_filters(
     store: RunStore, effective_runtime: EffectiveRuntime
 ) -> None:
@@ -119,9 +149,7 @@ def test_read_events_since_filters(
 def test_persist_revision_copies_bundle(
     store: RunStore, effective_runtime: EffectiveRuntime, tmp_path: Path
 ) -> None:
-    run, layout = store.create_run(
-        input_summary="cube", effective_runtime=effective_runtime
-    )
+    run, _ = store.create_run(input_summary="cube", effective_runtime=effective_runtime)
     bundle = _make_bundle(tmp_path)
     revision, rev_layout = store.persist_revision(run, bundle)
 
@@ -142,7 +170,6 @@ def test_persist_revision_copies_bundle(
     assert reloaded.revisions == ["rev-001"]
     assert reloaded.current_revision_id == "rev-001"
 
-    # Manifest records required + optional entries
     manifest = json.loads(rev_layout.artifact_manifest.read_text())
     roles = {e["role"] for e in manifest["entries"]}
     assert {"model_py", "step", "glb", "render_sheet"}.issubset(roles)
@@ -193,9 +220,7 @@ def test_snapshot_tracks_last_event(
     run, _ = store.create_run(input_summary="x", effective_runtime=effective_runtime)
     store.append_event(
         run.run_name,
-        ProgressEvent(
-            index=0, kind=ProgressEventKind.breadcrumb, message="hello world"
-        ),
+        ProgressEvent(index=0, kind=ProgressEventKind.breadcrumb, message="hello world"),
     )
     snap = store.load_snapshot(run.run_name)
     assert snap.last_event_kind == ProgressEventKind.breadcrumb.value
@@ -203,12 +228,58 @@ def test_snapshot_tracks_last_event(
     assert snap.last_event_index >= 1
 
 
+def test_latest_narration_prefers_highest_index(
+    store: RunStore, effective_runtime: EffectiveRuntime
+) -> None:
+    run, _ = store.create_run(input_summary="x", effective_runtime=effective_runtime)
+    store.append_event(
+        run.run_name,
+        ProgressEvent(index=0, kind=ProgressEventKind.narration, phase="plan", message="drafting"),
+    )
+    store.append_event(
+        run.run_name,
+        ProgressEvent(index=0, kind=ProgressEventKind.breadcrumb, message="checkpoint"),
+    )
+    store.append_event(
+        run.run_name,
+        ProgressEvent(index=0, kind=ProgressEventKind.narration, phase="review", message="checking"),
+    )
+
+    snap = store.load_snapshot(run.run_name)
+    assert snap.latest_narration == "checking"
+    assert snap.latest_narration_phase == "review"
+    assert snap.latest_narration_index == 3
+
+
+def test_snapshot_without_revision_or_review_is_sparse(
+    store: RunStore, effective_runtime: EffectiveRuntime
+) -> None:
+    run, _ = store.create_run(input_summary="x", effective_runtime=effective_runtime)
+    snap = store.load_snapshot(run.run_name)
+    assert snap.current_revision_name is None
+    assert snap.artifacts is not None
+    assert snap.artifacts.step_path is None
+    assert snap.artifacts.glb_path is None
+    assert snap.latest_review_decision is None
+    assert snap.latest_review_summary_path is None
+
+
+def test_snapshot_with_revision_without_review_has_artifacts_only(
+    store: RunStore, effective_runtime: EffectiveRuntime, tmp_path: Path
+) -> None:
+    run, _ = store.create_run(input_summary="cube", effective_runtime=effective_runtime)
+    store.persist_revision(run, _make_bundle(tmp_path))
+
+    snap = store.load_snapshot(run.run_name)
+    assert snap.current_revision_name == "rev-001"
+    assert snap.artifacts is not None
+    assert snap.latest_review_decision is None
+    assert snap.latest_review_summary_path is None
+
+
 def test_atomic_write_leaves_no_tmp_file(
     store: RunStore, effective_runtime: EffectiveRuntime
 ) -> None:
-    run, layout = store.create_run(
-        input_summary="x", effective_runtime=effective_runtime
-    )
-    # No stray .tmp artifacts
+    _, layout = store.create_run(input_summary="x", effective_runtime=effective_runtime)
     leftovers = list(layout.root.rglob("*.tmp"))
     assert leftovers == []
