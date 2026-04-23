@@ -141,7 +141,7 @@ class RunDriver:
         fresh = self.store.load_run(run.run_name)
         snap = self.store.load_snapshot(run.run_name)
         payload = {
-            "spec": plan.normalized_spec,
+            "spec": plan.normalized_spec.model_dump(),
             "delivered_revision": delivered_rev_name,
             "revisions": fresh.revisions,
             "latest_review_decision": (snap.latest_review_decision.value if snap.latest_review_decision else None),

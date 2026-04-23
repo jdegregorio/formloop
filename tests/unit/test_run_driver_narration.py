@@ -26,6 +26,7 @@ from formloop.agents.manager import (
     AssumptionProposal,
     ManagerFinalAnswer,
     ManagerPlan,
+    NormalizedSpec,
 )
 from formloop.agents.narrator import NarrationInput
 from formloop.config.profiles import (
@@ -78,7 +79,18 @@ def _install_runner_stub(monkeypatch) -> None:
         if name == "manager_planner":
             return _FakeResult(
                 final_output=ManagerPlan(
-                    normalized_spec={"kind": "cube", "size_mm": 20},
+                    normalized_spec=NormalizedSpec(
+                        name="cube",
+                        type="component",
+                        units="mm",
+                        design_intent="Simple calibration cube.",
+                        features=["Solid cube body"],
+                        interfaces=[],
+                        constraints=["edge length must be 20 mm"],
+                        preferences=[],
+                        manufacturing_method=None,
+                        key_dimension_parameters={"size_mm": 20},
+                    ),
                     assumptions=[
                         AssumptionProposal(topic="size", assumption="20mm cube")
                     ],
@@ -212,7 +224,18 @@ async def test_run_driver_coordinates_phase_functions(tmp_path, monkeypatch) -> 
         assert ctx is driver
         calls.append("plan")
         return ManagerPlan(
-            normalized_spec={"kind": "cube", "size_mm": 20},
+            normalized_spec=NormalizedSpec(
+                name="cube",
+                type="component",
+                units="mm",
+                design_intent="Simple calibration cube.",
+                features=["Solid cube body"],
+                interfaces=[],
+                constraints=["edge length must be 20 mm"],
+                preferences=[],
+                manufacturing_method=None,
+                key_dimension_parameters={"size_mm": 20},
+            ),
             assumptions=[],
             research_topics=[],
             design_brief="brief",

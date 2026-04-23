@@ -34,7 +34,7 @@ async def review_phase(
         message=f"reviewing {revision.revision_name}",
     )
     payload = {
-        "spec": plan.normalized_spec,
+        "spec": plan.normalized_spec.model_dump(),
         "designer_notes": cad_out.revision_notes,
         "designer_dimensions": cad_out.dimensions,
         "known_risks": cad_out.known_risks,
