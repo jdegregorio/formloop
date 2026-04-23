@@ -75,8 +75,10 @@ def test_review_summary_decision_enum() -> None:
         decision=ReviewDecision.pass_,
         confidence=0.92,
         key_findings=["looks right"],
+        feature_checklist=[{"feature": "overall silhouette", "status": "pass"}],
     )
     assert rs.decision is ReviewDecision.pass_
+    assert rs.feature_checklist[0]["feature"] == "overall silhouette"
     # Revise requires concrete instructions in practice; schema doesn't enforce
     # but the field defaults to "".
     assert rs.revision_instructions == ""

@@ -14,10 +14,10 @@ from formloop.agents import (
     ResearchFinding,
     build_cad_designer,
     build_design_researcher,
+    build_judge,
     build_manager_final,
     build_manager_plan,
-    build_quality_specialist_judge,
-    build_quality_specialist_review,
+    build_reviewer,
 )
 from formloop.config.profiles import Profile
 from formloop.schemas import JudgeOutput, ReviewSummary
@@ -63,9 +63,9 @@ def test_cad_designer_registers_four_tools(profile: Profile) -> None:
     assert {"write_model", "build_model_cli", "inspect_model", "render_model"} <= tool_names
 
 
-def test_quality_specialist_modes(profile: Profile) -> None:
-    review = build_quality_specialist_review(profile)
-    judge = build_quality_specialist_judge(profile)
+def test_reviewer_and_judge_modes(profile: Profile) -> None:
+    review = build_reviewer(profile)
+    judge = build_judge(profile)
     assert _underlying_type(review) is ReviewSummary
     assert _underlying_type(judge) is JudgeOutput
     # The two modes must use distinct instruction bodies (FLH-F-006/014 differ).

@@ -24,7 +24,7 @@ from ..agents import (
     build_design_researcher,
     build_manager_final,
     build_manager_plan,
-    build_quality_specialist_review,
+    build_reviewer,
 )
 from ..agents.cad_designer import CadRevisionResult
 from ..agents.manager import ManagerFinalAnswer, ManagerPlan
@@ -91,6 +91,8 @@ def _write_inspect_json(run_root: Path, attempt: int, payload: dict | None) -> P
 
 
 import re as _re
+import base64
+import mimetypes
 
 _FORBIDDEN_PATTERNS = (
     _re.compile(r"run-\d+"),
@@ -162,6 +164,39 @@ def _fallback_review(review) -> str:
     if review.key_findings:
         return f"review {decision}: {review.key_findings[0][:160]}"
     return f"review {decision}"
+
+
+def _read_source_excerpt(path: Path, *, max_chars: int = 20000) -> str:
+    if not path.is_file():
+        return ""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars] + "\n\n# [truncated]"
+
+
+def _image_input_item(path: Path) -> dict[str, str] | None:
+    if not path.is_file():
+        return None
+    mime, _ = mimetypes.guess_type(path.name)
+    mime = mime or "image/png"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return {"type": "input_image", "image_url": f"data:{mime};base64,{encoded}"}
+
+
+def _multimodal_payload(text_payload: dict[str, Any], image_paths: list[Path]) -> list[dict[str, Any]]:
+    content: list[dict[str, Any]] = [
+        {
+            "type": "input_text",
+            "text": "Review this revision and produce a ReviewSummary.\n\n"
+            + json.dumps(text_payload, indent=2, default=str),
+        }
+    ]
+    for path in image_paths:
+        image_item = _image_input_item(path)
+        if image_item:
+            content.append(image_item)
+    return [{"role": "user", "content": content}]
 
 
 class RunDriver:
@@ -618,21 +653,27 @@ class RunDriver:
         # No pre-review narration — it would just restate the previous
         # update. We wait until the review is done so we can quote what
         # the reviewer actually found.
-        reviewer = build_quality_specialist_review(profile)
+        reviewer = build_reviewer(profile)
         payload = {
             "spec": plan.normalized_spec,
             "designer_notes": cad_out.revision_notes,
             "designer_dimensions": cad_out.dimensions,
             "known_risks": cad_out.known_risks,
             "inspect_summary": run_ctx.notes.get("last_inspect"),
-            "render_sheet": "7-view composite (front/back/left/right/top/bottom/iso)",
+            "model_source": _read_source_excerpt(run_ctx.source_dir / "model.py"),
+            "review_focus": {
+                "primary_modality": "visual",
+                "required_images": ["render_sheet", "reference_image_if_present"],
+                "feature_checklist": "Cover all meaningful spec features with flexible checklist items.",
+            },
         }
+        sheet_path = run_ctx.run_root / "revisions" / revision.revision_name / "render-sheet.png"
+        image_paths = [sheet_path]
+        if run.reference_image:
+            image_paths.append(Path(run.reference_image))
         reviewer_run = await Runner.run(
             reviewer,
-            input=(
-                "Review this revision and produce a ReviewSummary.\n\n"
-                + json.dumps(payload, indent=2, default=str)
-            ),
+            input=_multimodal_payload(payload, image_paths),
         )
         review: ReviewSummary = reviewer_run.final_output
         fresh = self.store.load_run(run.run_name)
@@ -672,8 +713,10 @@ class RunDriver:
                     getattr(review, "suspect_dimensions_to_recheck", None) or []
                 )[:4],
                 "revision_instructions": list(
-                    getattr(review, "revision_instructions", None) or []
-                )[:3],
+                    [getattr(review, "revision_instructions", "")]
+                    if getattr(review, "revision_instructions", "")
+                    else []
+                )[:1],
             },
             fallback=_fallback_review(review),
         )

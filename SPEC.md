@@ -39,7 +39,8 @@ The v1 harness architecture is manager plus specialists exposed as bounded tools
 - **Manager**
 - **CAD Designer**
 - **Design Researcher**
-- **Quality Specialist**
+- **Reviewer**
+- **Judge**
 
 The manager owns the user-facing objective and the final answer. Specialists do not take over the run. They are exposed to the manager as callable capabilities through `agent.as_tool()` or the equivalent SDK pattern so the manager keeps control of orchestration and output.
 
@@ -81,12 +82,8 @@ The specialist roles are intentionally small:
 
 - **CAD Designer** owns CAD authoring, artifact-oriented `cad-cli` usage, and revision execution.
 - **Design Researcher** owns external factual research and uses OpenAI search-enabled requests when web research is needed.
-- **Quality Specialist** owns both normal design review and developer eval judging, with different inputs depending on whether ground truth exists.
-
-The Quality Specialist supports two modes:
-
-- normal design review against the current spec, artifacts, and optional reference image
-- developer eval review against ground-truth data plus deterministic metrics
+- **Reviewer** owns normal design-loop review against the current spec, artifacts, and optional reference image.
+- **Judge** owns developer-eval judgment against ground-truth data plus deterministic metrics.
 
 #### Parallel Research
 
