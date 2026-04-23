@@ -5,9 +5,11 @@ REQ: FLH-F-011, FLH-F-021, FLH-F-022, FLH-F-023, FLH-D-023, FLH-D-024
 
 from .layout import RunLayout, RevisionLayout
 from .naming import next_revision_name, next_run_name
+from .candidate_bundle import CandidateBundle
 from .run_store import RunStore
 
 __all__ = [
+    "CandidateBundle",
     "RevisionLayout",
     "RunLayout",
     "RunStore",
