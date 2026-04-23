@@ -197,3 +197,41 @@ def driver_snapshot(tmp_path: Path, run_name: str) -> dict:
 
     path = tmp_path / "runs" / run_name / "snapshot.json"
     return json.loads(path.read_text())
+
+
+async def test_run_driver_coordinates_phase_functions(tmp_path, monkeypatch) -> None:
+    """RunDriver should delegate orchestration to phase modules in order."""
+
+    _install_runner_stub(monkeypatch)
+    config = _stub_config(tmp_path)
+    driver = RunDriver(config, narrator=Narrator(fallback_only=True))
+
+    calls: list[str] = []
+
+    async def fake_plan(ctx, runtime):
+        assert ctx is driver
+        calls.append("plan")
+        return ManagerPlan(
+            normalized_spec={"kind": "cube", "size_mm": 20},
+            assumptions=[],
+            research_topics=[],
+            design_brief="brief",
+        )
+
+    async def fake_research(ctx, runtime, *, plan):
+        assert ctx is driver
+        calls.append("research")
+        return []
+
+    async def fake_revision(ctx, runtime, *, plan, findings, max_revisions):
+        assert ctx is driver
+        calls.append("revision")
+        return None
+
+    monkeypatch.setattr("formloop.orchestrator.run_driver.plan_phase", fake_plan)
+    monkeypatch.setattr("formloop.orchestrator.run_driver.research_phase", fake_research)
+    monkeypatch.setattr("formloop.orchestrator.run_driver.revision_loop_phase", fake_revision)
+
+    result = await driver.run(DriveRequest(prompt="a 20mm cube"))
+    assert calls == ["plan", "research", "revision"]
+    assert result["status"] == "failed"
