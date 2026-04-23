@@ -39,6 +39,8 @@ Rules:
 - Report your own confidence honestly in the 0..1 field — low confidence is fine
   and is more useful than false certainty.
 - Do not speculate about the surrounding design brief; just answer the topic.
+- If the topic includes an "available libraries" list, constrain implementation
+  guidance to that list and avoid suggesting unavailable packages.
 - Always call the web_search tool at least once before responding unless the
   question is purely definitional."""
 

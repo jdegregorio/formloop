@@ -25,6 +25,7 @@ from ..runtime.cad_cli import (
     cad_render,
 )
 from ..runtime.constrained_python import write_model_source
+from .build123d_libraries import available_build123d_libraries_text
 from .common import (
     Agent,
     RunContext,
@@ -66,8 +67,14 @@ Workflow every turn:
    ``def build_model(params: dict, context: object)`` and returns a single solid.
    - Default values inside ``build_model`` should match the spec exactly so that
      ``cad build`` succeeds with no overrides.
-   - Use only ``build123d`` primitives: Box, Cylinder, Sphere, Cone, Pos, Rot,
-     boolean union (+), difference (-), intersection (&). Avoid exotic CAD.
+   - Prefer clear build123d primitives first (Box, Cylinder, Sphere, Cone, Pos,
+     Rot, boolean union (+), difference (-), intersection (&)).
+   - You may also use these installed Build123D ecosystem libraries when they
+     are the best fit: """
+INSTRUCTIONS += available_build123d_libraries_text()
+INSTRUCTIONS += """
+     (e.g. fasteners, beams/bars, V-slot components, gear generation).
+   - Keep imports explicit and minimal; do not pull in uninstalled libraries.
    - Keep the source small and readable — the goal is a correct minimum solid.
 3. Call ``write_model`` with the full source text.
 4. Call ``build_model_cli`` to run ``cad build``. If it errors, read the error,
@@ -78,8 +85,9 @@ Workflow every turn:
    risks, and recording the key dimensions you believe the solid has.
 
 Rules:
-- Do NOT import build123d constructs you are unsure about; stick to the allowed
-  list above unless the spec truly requires more.
+- Do NOT import CAD constructs you are unsure about.
+- If a requested feature maps directly to an installed part library/helper,
+  prefer that library over hand-rolling fragile geometry.
 - All measurements are millimeters.
 - Do not fabricate inspection numbers — only report dimensions that survived the
   ``cad inspect`` check."""
