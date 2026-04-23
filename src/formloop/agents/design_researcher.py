@@ -18,7 +18,7 @@ class ResearchCitation(BaseModel):
 
 class ResearchFinding(BaseModel):
     topic: str
-    summary: str = Field(description="Comprehensive factual finding usable as design input; include numbers, tolerances, and standard identifiers.")
+    summary: str = Field(description="Comprehensive factual finding usable as design input; include concrete numbers and standard identifiers.")
     citations: list[ResearchCitation] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0, default=0.6)
 
@@ -33,7 +33,7 @@ Rules:
 - Favor authoritative references (standards bodies, manufacturers, engineering
   handbooks) over forums when possible.
 - Write as much detail as the topic warrants. Always include concrete numbers,
-  tolerances, standard identifiers, and material properties where relevant.
+  standard identifiers, key dimensions, and material properties where relevant.
   Prioritize depth and completeness over brevity — a thorough finding is more
   useful than a brief one.
 - Report your own confidence honestly in the 0..1 field — low confidence is fine

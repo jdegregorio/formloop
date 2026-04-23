@@ -37,7 +37,7 @@ def _make_bundle(tmp: Path, trigger: RevisionTrigger = RevisionTrigger.initial) 
     src.mkdir(parents=True, exist_ok=True)
     model_py = src / "model.py"
     model_py.write_text("def build_model(params, context):\n    return None\n")
-    step = src / "step.step"
+    step = src / "model.step"
     step.write_text("ISO-STEP\n")
     glb = src / "model.glb"
     glb.write_bytes(b"\x00glb")

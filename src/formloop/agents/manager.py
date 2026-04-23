@@ -22,7 +22,7 @@ class ManagerPlan(BaseModel):
     normalized_spec: dict = Field(
         description=(
             "Machine-readable design spec. Must include dimensions in mm, "
-            "counts of named features, and any tolerances."
+            "counts of named features, and nominal dimensions for each feature."
         )
     )
     assumptions: list[AssumptionProposal] = Field(
@@ -59,8 +59,7 @@ Rules:
   units, convert and record the conversion as an assumption.
 - Populate ``normalized_spec`` with keys like ``kind``, ``overall_dimensions_mm``
   (dict with width/depth/height or radius/length as appropriate), ``features``
-  (list of objects with type + dimensions + count + positions), and
-  ``tolerances``.
+  (list of objects with type + dimensions + count + positions).
 - If the user under-specifies a value (e.g. "a plate with holes" with no hole
   count), pick a sensible minimum and record it as an assumption. Prefer simple
   round values.

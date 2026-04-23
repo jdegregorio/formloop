@@ -25,7 +25,7 @@ class RevisionLayout:
 
     @property
     def step(self) -> Path:
-        return self.root / "step.step"
+        return self.root / "model.step"
 
     @property
     def glb(self) -> Path:

@@ -74,7 +74,7 @@ class RevisionStore:
     def _manifest_entries(rev_layout: RevisionLayout) -> list[ArtifactEntry]:
         entries: list[ArtifactEntry] = [
             ArtifactEntry(role="model_py", path="model.py", format="python"),
-            ArtifactEntry(role="step", path="step.step", format="step"),
+            ArtifactEntry(role="step", path="model.step", format="step"),
             ArtifactEntry(role="glb", path="model.glb", format="glb"),
             ArtifactEntry(role="render_sheet", path="render-sheet.png", format="png"),
         ]
