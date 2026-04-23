@@ -195,7 +195,6 @@ Each eval case should carry the minimum information needed for repeatable benchm
 - normalized spec
 - ground-truth STEP
 - optional reference image
-- optional tolerances
 - tags
 
 Each eval run should produce:

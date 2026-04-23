@@ -24,7 +24,7 @@ def _batch_dir(config: HarnessConfig, batch_name: str) -> Path:
 
 
 def _delivered_step(config: HarnessConfig, run_name: str, rev_name: str) -> Path:
-    return config.runs_dir / run_name / "revisions" / rev_name / "step.step"
+    return config.runs_dir / run_name / "revisions" / rev_name / "model.step"
 
 
 async def run_eval_batch(
@@ -55,7 +55,6 @@ async def run_eval_batch(
                     "case_id": case.case_id,
                     "prompt": case.prompt,
                     "spec": case.spec,
-                    "tolerances": case.tolerances,
                     "tags": case.tags,
                 },
                 indent=2,

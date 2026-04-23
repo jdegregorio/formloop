@@ -63,7 +63,7 @@ def test_artifact_manifest_entries() -> None:
     manifest = ArtifactManifest(
         revision_name="rev-001",
         entries=[
-            ArtifactEntry(role="step", path="step.step", format="step"),
+            ArtifactEntry(role="step", path="model.step", format="step"),
             ArtifactEntry(role="glb", path="model.glb", format="glb"),
         ],
     )

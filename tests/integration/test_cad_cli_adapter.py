@@ -30,7 +30,7 @@ def test_cad_build_cube(
     assert result.step_path.is_file()
     assert result.glb_path.is_file()
     assert (out / "build-metadata.json").is_file()
-    # Bounding box should match a 20mm cube within float tolerance
+    # Bounding box should match a 20mm cube within floating-point precision
     bb = result.bounding_box
     assert bb.size == pytest.approx([20.0, 20.0, 20.0], abs=1e-3)
     # Volume = 20^3 = 8000

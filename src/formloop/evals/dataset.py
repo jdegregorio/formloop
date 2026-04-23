@@ -14,7 +14,6 @@ class EvalCase:
     spec: dict
     ground_truth_step: Path
     reference_image: Path | None = None
-    tolerances: dict = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
 
 
@@ -45,7 +44,6 @@ def load_cases(dataset_path: Path) -> list[EvalCase]:
                 spec=row.get("spec", {}),
                 ground_truth_step=gt,
                 reference_image=ref_path,
-                tolerances=row.get("tolerances", {}),
                 tags=row.get("tags", []),
             )
         )

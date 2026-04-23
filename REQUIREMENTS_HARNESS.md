@@ -231,7 +231,7 @@ The default revision bundle under each revision folder shall be:
 
 - `revision.json`
 - `artifact-manifest.json`
-- `step.step`
+- `model.step`
 - `model.glb`
 - `render-sheet.png`
 - `views/`
