@@ -12,14 +12,12 @@ async def plan_phase(
     run = runtime.run
     plan = await ctx.plan(runtime.user_prompt, runtime.profile)
     fresh = ctx.load_run(run.run_name)
-    fresh.current_spec = dict(plan.normalized_spec)
+    fresh.current_spec = plan.normalized_spec.model_dump()
     fresh.assumptions = [
         AssumptionRecord(topic=a.topic, assumption=a.assumption) for a in plan.assumptions
     ]
     ctx.save_run(fresh)
-    spec_kind = None
-    if isinstance(plan.normalized_spec, dict):
-        spec_kind = plan.normalized_spec.get("kind") or plan.normalized_spec.get("type")
+    spec_kind = plan.normalized_spec.type
     ctx.emit(
         run.run_name,
         ProgressEventKind.spec_normalized,

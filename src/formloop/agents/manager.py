@@ -5,6 +5,8 @@ REQ: FLH-F-002, FLH-F-004, FLH-F-017, FLH-F-019, FLH-F-020, FLH-D-007
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from ..config.profiles import Profile
@@ -16,13 +18,55 @@ class AssumptionProposal(BaseModel):
     assumption: str = Field(description="The stated value or choice we are assuming.")
 
 
+class NormalizedSpec(BaseModel):
+    """Structured, stable spec contract shared across the run."""
+
+    name: str = Field(description="Short descriptive name for the component/assembly.")
+    type: Literal["component", "assembly"] = Field(
+        description="Whether this is a single component or an assembly."
+    )
+    units: str = Field(
+        default="mm",
+        description="Canonical units for dimensions. Prefer 'mm'.",
+    )
+    design_intent: str = Field(
+        description="High-level functional/design intent summary for the model."
+    )
+    features: list[str] = Field(
+        default_factory=list,
+        description="List of meaningful geometric/features requirements.",
+    )
+    interfaces: list[str] = Field(
+        default_factory=list,
+        description="Interface requirements and mating/connection considerations.",
+    )
+    constraints: list[str] = Field(
+        default_factory=list,
+        description="Hard constraints that must be satisfied.",
+    )
+    preferences: list[str] = Field(
+        default_factory=list,
+        description="Soft preferences and flexible options.",
+    )
+    manufacturing_method: str | None = Field(
+        default=None,
+        description="Preferred manufacturing method if specified or inferred.",
+    )
+    key_dimension_parameters: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "Parameterized named dimensions (mm) that should align with model.py "
+            "variables for later manual adjustment."
+        ),
+    )
+
+
 class ManagerPlan(BaseModel):
     """Structured plan the manager produces at the start of a run (FLH-F-001)."""
 
-    normalized_spec: dict = Field(
+    normalized_spec: NormalizedSpec = Field(
         description=(
-            "Machine-readable design spec. Must include dimensions in mm, "
-            "counts of named features, and nominal dimensions for each feature."
+            "Machine-readable design spec using the structured NormalizedSpec contract."
         )
     )
     assumptions: list[AssumptionProposal] = Field(
@@ -58,9 +102,18 @@ prompt into a concrete design spec and a short design brief for the CAD designer
 Rules:
 - Emit all dimensions in millimeters. If the user used inches or ambiguous
   units, convert and record the conversion as an assumption.
-- Populate ``normalized_spec`` with keys like ``kind``, ``overall_dimensions_mm``
-  (dict with width/depth/height or radius/length as appropriate), ``features``
-  (list of objects with type + dimensions + count + positions).
+- Populate ``normalized_spec`` with this exact high-level structure:
+  - ``name``: short descriptive component/assembly name.
+  - ``type``: ``component`` or ``assembly``.
+  - ``units``: canonical units (prefer ``mm``).
+  - ``design_intent``: concise high-level intent.
+  - ``features``: list of key feature descriptions.
+  - ``interfaces``: key interface/mating requirements.
+  - ``constraints``: hard requirements.
+  - ``preferences``: softer preferences/flexible dimensions.
+  - ``manufacturing_method``: optional manufacturing preference.
+  - ``key_dimension_parameters``: object of named numeric dimensions in mm
+    (flat name/value map intended to line up with model.py variables).
 - If the user under-specifies a value (e.g. "a plate with holes" with no hole
   count), pick a sensible minimum and record it as an assumption. Prefer simple
   round values.
@@ -136,6 +189,7 @@ __all__ = [
     "AssumptionProposal",
     "ManagerFinalAnswer",
     "ManagerPlan",
+    "NormalizedSpec",
     "build_manager_final",
     "build_manager_plan",
 ]

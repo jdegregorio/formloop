@@ -74,7 +74,7 @@ async def revision_loop_phase(
             )
         prompt_ctx = PromptContext(
             input_summary=runtime.user_prompt,
-            current_spec=plan.normalized_spec,
+            current_spec=plan.normalized_spec.model_dump(),
             assumptions=[{"topic": a.topic, "assumption": a.assumption} for a in plan.assumptions],
             research_findings=findings,
             prior_review=prior_review,
@@ -151,7 +151,7 @@ async def revision_loop_phase(
 
         bundle = CandidateBundle(
             trigger=RevisionTrigger.initial if attempt == 1 else RevisionTrigger.review_revise,
-            spec_snapshot=dict(plan.normalized_spec),
+            spec_snapshot=plan.normalized_spec.model_dump(),
             designer_notes=cad_out.revision_notes,
             known_risks=list(cad_out.known_risks),
             model_py_src=runtime.run_ctx.source_dir / "model.py",
