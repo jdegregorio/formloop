@@ -7,10 +7,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import json
 import httpx
 import pytest
 
-from formloop.api.app import create_app
+from formloop.api.app import _resolve_artifact, create_app
 from formloop.config.profiles import (
     ApiConfig,
     HarnessConfig,
@@ -25,6 +26,7 @@ from formloop.schemas import (
     ReviewSummary,
     RevisionTrigger,
 )
+from formloop.schemas.artifact_roles import is_valid_role_name
 from formloop.store import RunStore
 from formloop.store.run_store import CandidateBundle
 
@@ -161,3 +163,39 @@ async def test_snapshot_and_events_and_artifacts(tmp_path: Path) -> None:
         # unknown run
         r = await client.get("/runs/run-9999/snapshot")
         assert r.status_code == 404
+
+
+async def test_manifest_roles_are_api_resolvable(tmp_path: Path) -> None:
+    config = _stub_config(tmp_path)
+    app = create_app(config)
+    store = app.state.store
+    run, revision = _seed_run_with_revision(store, tmp_path)
+
+    manifest_path = (
+        config.runs_dir
+        / run.run_name
+        / "revisions"
+        / revision.revision_name
+        / "artifact-manifest.json"
+    )
+    entries = json.loads(manifest_path.read_text())["entries"]
+    for entry in entries:
+        role = entry["role"]
+        assert is_valid_role_name(role)
+        resolved = _resolve_artifact(config, run.run_name, revision.revision_name, role)
+        assert resolved is not None
+        assert resolved.is_file()
+
+
+async def test_artifact_endpoint_rejects_invalid_role(tmp_path: Path) -> None:
+    config = _stub_config(tmp_path)
+    app = create_app(config)
+    store = app.state.store
+    run, revision = _seed_run_with_revision(store, tmp_path)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.get(
+            f"/runs/{run.run_name}/revisions/{revision.revision_name}/artifacts/view_../etc/passwd"
+        )
+        assert r.status_code == 400

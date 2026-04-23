@@ -17,6 +17,7 @@ from ..config.profiles import HarnessConfig, load_config
 from ..orchestrator import RunDriver
 from ..orchestrator.run_driver import DriveRequest
 from ..schemas import RunCreateRequest, RunCreateResponse
+from ..schemas.artifact_roles import is_valid_role_name, resolve_relative_path
 from ..store import RunStore
 
 
@@ -94,6 +95,8 @@ def create_app(config: HarnessConfig | None = None) -> FastAPI:
 
     @app.get("/runs/{run_name}/revisions/{rev_name}/artifacts/{role}")
     def get_artifact(run_name: str, rev_name: str, role: str) -> FileResponse:
+        if not is_valid_role_name(role):
+            raise HTTPException(400, detail=f"invalid artifact role={role}")
         path = _resolve_artifact(cfg, run_name, rev_name, role)
         if path is None or not path.is_file():
             raise HTTPException(404, detail=f"artifact role={role} not found")
@@ -131,30 +134,16 @@ def _next_since(events: list[dict], current: int) -> int:
     return events[-1]["index"] + 1
 
 
-_ROLE_PATHS = {
-    "model_py": "model.py",
-    "step": "step.step",
-    "glb": "model.glb",
-    "render_sheet": "render-sheet.png",
-    "revision": "revision.json",
-    "manifest": "artifact-manifest.json",
-    "review": "review-summary.json",
-    "build_metadata": "build-metadata.json",
-    "render_metadata": "render-metadata.json",
-    "inspect_summary": "inspect-summary.json",
-    "designer_notes": "designer-notes.md",
-}
-
-
 def _resolve_artifact(
     cfg: HarnessConfig, run_name: str, rev_name: str, role: str
 ) -> Path | None:
+    if not is_valid_role_name(role):
+        return None
+    rel = resolve_relative_path(role)
+    if rel is None:
+        return None
     base = cfg.runs_dir / run_name / "revisions" / rev_name
-    if role in _ROLE_PATHS:
-        return base / _ROLE_PATHS[role]
-    if role.startswith("view_"):
-        return base / "views" / f"{role[len('view_'):]}.png"
-    return None
+    return base / rel
 
 
 # Module-level singleton used by ``uvicorn formloop.api.app:app``.

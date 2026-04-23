@@ -28,6 +28,7 @@ from ..schemas import (
     SnapshotArtifacts,
 )
 from ..schemas._common import utcnow_iso
+from ..schemas.artifact_roles import persisted_manifest_specs, view_role_name
 from .layout import RevisionLayout, RunLayout
 from .naming import next_revision_name, next_run_name
 
@@ -216,46 +217,26 @@ class RunStore:
         if bundle.designer_notes:
             rev_layout.designer_notes.write_text(bundle.designer_notes, encoding="utf-8")
 
-        # Build the manifest.
-        entries: list[ArtifactEntry] = [
-            ArtifactEntry(role="model_py", path="model.py", format="python"),
-            ArtifactEntry(role="step", path="step.step", format="step"),
-            ArtifactEntry(role="glb", path="model.glb", format="glb"),
-            ArtifactEntry(role="render_sheet", path="render-sheet.png", format="png"),
-        ]
+        # Build the manifest using the shared artifact-role registry.
+        entries: list[ArtifactEntry] = []
+        for spec in persisted_manifest_specs():
+            rel = Path(spec.filename)
+            if not spec.required and not (rev_layout.root / rel).is_file():
+                continue
+            entries.append(
+                ArtifactEntry(
+                    role=spec.role,
+                    path=spec.filename,
+                    format=spec.format,
+                    required=spec.required,
+                )
+            )
         for view in sorted(rev_layout.views_dir.glob("*.png")):
             entries.append(
                 ArtifactEntry(
-                    role=f"view_{view.stem}",
+                    role=view_role_name(view.stem),
                     path=f"views/{view.name}",
                     format="png",
-                )
-            )
-        if rev_layout.build_meta.is_file():
-            entries.append(
-                ArtifactEntry(
-                    role="build_metadata",
-                    path="build-metadata.json",
-                    format="json",
-                    required=False,
-                )
-            )
-        if rev_layout.render_meta.is_file():
-            entries.append(
-                ArtifactEntry(
-                    role="render_metadata",
-                    path="render-metadata.json",
-                    format="json",
-                    required=False,
-                )
-            )
-        if rev_layout.inspect_summary.is_file():
-            entries.append(
-                ArtifactEntry(
-                    role="inspect_summary",
-                    path="inspect-summary.json",
-                    format="json",
-                    required=False,
                 )
             )
         manifest = ArtifactManifest(revision_name=name, entries=entries)
