@@ -283,38 +283,24 @@ class RunDriver:
                 max_revisions=max_revisions,
                 user_prompt=user_prompt,
             )
+            final = await self._finalize(run, plan, delivered_rev_name, profile)
             run = self.store.load_run(run.run_name)
+            run.final_answer = AgentAnswer(
+                text=final.text,
+                delivered_revision_name=delivered_rev_name,
+            )
+            run.status = (
+                RunStatus.succeeded if delivered_rev_name else RunStatus.failed
+            )
             if not delivered_rev_name:
-                snap = self.store.load_snapshot(run.run_name)
-                if snap.latest_review_decision == ReviewDecision.revise:
-                    run.status_detail = (
-                        "max revisions exhausted before reviewer approved a revision"
-                    )
-                else:
-                    run.status_detail = "no accepted revision was delivered"
-                run.status = RunStatus.failed
-                self.store.save_run(run)
-                self._emit(
-                    run.run_name,
-                    ProgressEventKind.run_failed,
-                    message=run.status_detail,
-                    data={"error_type": "revision_loop_exhausted"},
-                )
-            else:
-                final = await self._finalize(run, plan, delivered_rev_name, profile)
-                run.final_answer = AgentAnswer(
-                    text=final.text,
-                    delivered_revision_name=delivered_rev_name,
-                )
-                run.status = RunStatus.succeeded
-                run.status_detail = None
-                self.store.save_run(run)
-                self._emit(
-                    run.run_name,
-                    ProgressEventKind.delivered,
-                    message=f"run {run.run_name} delivered",
-                    data={"revision": delivered_rev_name, "status": run.status.value},
-                )
+                run.status_detail = "no revision bundle was delivered"
+            self.store.save_run(run)
+            self._emit(
+                run.run_name,
+                ProgressEventKind.delivered,
+                message=f"run {run.run_name} delivered",
+                data={"revision": delivered_rev_name, "status": run.status.value},
+            )
         except Exception as exc:  # noqa: BLE001 — top-level reporting
             run = self.store.load_run(run.run_name)
             run.status = RunStatus.failed
@@ -476,7 +462,6 @@ class RunDriver:
     ) -> str | None:
         prior_review: dict | None = None
         delivered: str | None = None
-        accepted = False
 
         for attempt in range(1, max_revisions + 1):
             self._emit(
@@ -637,7 +622,6 @@ class RunDriver:
                 revision=revision,
             )
             if review.decision == ReviewDecision.pass_:
-                accepted = True
                 self._emit(
                     run.run_name,
                     ProgressEventKind.breadcrumb,
@@ -649,7 +633,7 @@ class RunDriver:
                 break
             prior_review = review.model_dump()
 
-        return delivered if accepted else None
+        return delivered
 
     async def _review(
         self,

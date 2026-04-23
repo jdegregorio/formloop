@@ -36,7 +36,7 @@ from formloop.config.profiles import (
 )
 from formloop.orchestrator.narrator import Narrator
 from formloop.orchestrator.run_driver import DriveRequest, RunDriver
-from formloop.schemas import ProgressEventKind, ReviewDecision, ReviewSummary
+from formloop.schemas import ProgressEventKind
 
 
 pytestmark = pytest.mark.asyncio
@@ -190,68 +190,6 @@ async def test_run_survives_narrator_failure(tmp_path, monkeypatch) -> None:
     for ev in narration:
         assert ev.narration_error is not None
         assert ev.message  # fallback message present
-
-
-async def test_run_fails_when_revision_loop_exhausts_without_accepted_revision(
-    tmp_path, monkeypatch
-) -> None:
-    config = _stub_config(tmp_path)
-    driver = RunDriver(config, narrator=Narrator(fallback_only=True))
-
-    async def fake_plan(run, prompt, profile):  # noqa: ARG001
-        return ManagerPlan(
-            normalized_spec={"kind": "plate_with_holes"},
-            assumptions=[],
-            research_topics=[],
-            design_brief="plate with two holes",
-        )
-
-    async def fake_research(run, plan, profile):  # noqa: ARG001
-        return []
-
-    async def fake_revision_loop(
-        *,
-        run,
-        run_ctx,
-        plan,
-        findings,
-        profile,
-        max_revisions,
-        user_prompt,
-    ):  # noqa: ARG001
-        fresh = driver.store.load_run(run.run_name)
-        fresh.current_revision_id = "rev-001"
-        driver.store.save_run(fresh)
-        rev_dir = tmp_path / "runs" / run.run_name / "revisions" / "rev-001"
-        rev_dir.mkdir(parents=True, exist_ok=True)
-        review_path = rev_dir / "review-summary.json"
-        review_path.write_text(
-            ReviewSummary(
-                decision=ReviewDecision.revise,
-                confidence=0.9,
-                key_findings=["hole diameter is wrong"],
-                revision_instructions="fix the holes",
-            ).model_dump_json(indent=2)
-        )
-        driver.store._refresh_snapshot(fresh, driver.store.layout(run.run_name))  # noqa: SLF001
-        return None
-
-    async def fake_finalize(run, plan, delivered_rev_name, profile):  # noqa: ARG001
-        raise AssertionError("finalize should not run without an accepted revision")
-
-    monkeypatch.setattr(driver, "_plan", fake_plan)
-    monkeypatch.setattr(driver, "_research", fake_research)
-    monkeypatch.setattr(driver, "_revision_loop", fake_revision_loop)
-    monkeypatch.setattr(driver, "_finalize", fake_finalize)
-
-    result = await driver.run(DriveRequest(prompt="plate"))
-
-    assert result["status"] == "failed"
-    assert result["delivered_revision"] is None
-    assert result["final_answer"] is None
-    stored = driver.store.load_run(result["run_name"])
-    assert stored.status.value == "failed"
-    assert "reviewer approved" in (stored.status_detail or "")
 
 
 def driver_snapshot(tmp_path: Path, run_name: str) -> dict:

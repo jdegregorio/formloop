@@ -22,10 +22,8 @@ import typer
 
 from ..config.env import load_env_local, repo_root
 from ..config.profiles import HarnessConfig, load_config
-from ..orchestrator import RunDriver
-from ..orchestrator.run_driver import DriveRequest
+from ..orchestrator import drive_run
 from ..runtime.cad_cli import locate_blender, locate_cad
-from ..schemas import ProgressEvent, ProgressEventKind, RunStatus
 from .run_renderer import make_renderer
 from .run_report import print_run_footer, print_run_header
 
@@ -53,33 +51,6 @@ app.add_typer(ui_app, name="ui")
 def _resolve_config() -> HarnessConfig:
     load_env_local()
     return load_config()
-
-
-def _mark_run_cancelled(
-    *,
-    driver: RunDriver,
-    run_name: str,
-    reason: str = "run cancelled by operator",
-) -> Path | None:
-    run = driver.store.load_run(run_name)
-    run.status = RunStatus.cancelled
-    run.status_detail = reason
-    driver.store.save_run(run)
-    driver.store.append_event(
-        run_name,
-        ProgressEvent(
-            index=0,
-            kind=ProgressEventKind.run_failed,
-            message=reason,
-            phase="failure",
-            data={"error_type": "KeyboardInterrupt"},
-        ),
-    )
-    if run.current_revision_id:
-        rev_dir = driver.store.layout(run_name).revision(run.current_revision_id).root
-        if rev_dir.is_dir():
-            return rev_dir
-    return None
 
 
 @app.command("run")
@@ -151,39 +122,18 @@ def run_cmd(
             color=not no_color,
         )
 
-    driver = RunDriver(config, event_hook=renderer)
-    request = DriveRequest(
-        prompt=prompt,
-        profile_name=profile,
-        model_override=model,
-        reasoning_override=effort,
-        reference_image=ref,
-        max_revisions=max_revisions,
-    )
-    run, run_ctx, effective_profile, resolved_max_revisions = driver.create_shell(request)
-
-    try:
-        result = asyncio.run(
-            driver.continue_run(
-                run=run,
-                run_ctx=run_ctx,
-                profile=effective_profile,
-                max_revisions=resolved_max_revisions,
-                user_prompt=prompt,
-            )
+    result = asyncio.run(
+        drive_run(
+            prompt,
+            config=config,
+            profile=profile,
+            model=model,
+            effort=effort,
+            reference_image=ref,
+            max_revisions=max_revisions,
+            event_hook=renderer,
         )
-    except KeyboardInterrupt:
-        artifacts_dir = _mark_run_cancelled(driver=driver, run_name=run.run_name)
-        if not quiet:
-            print_run_footer(
-                run_name=run.run_name,
-                status=RunStatus.cancelled.value,
-                delivered_revision=None,
-                artifacts_dir=artifacts_dir,
-                final_answer=None,
-                color=not no_color,
-            )
-        raise typer.Exit(code=130) from None
+    )
 
     if not quiet:
         print_run_footer(
