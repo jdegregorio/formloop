@@ -5,16 +5,16 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 from ..agents import Runner, build_judge
-from ..sdk_messages import build_single_user_multimodal_message
 from ..config.profiles import HarnessConfig
 from ..orchestrator import RunDriver
 from ..orchestrator.run_driver import DriveRequest
 from ..runtime.cad_cli import cad_compare
 from ..schemas import DeterministicMetrics, JudgeOutput
+from ..sdk_messages import build_single_user_multimodal_message
 from .dataset import EvalCase, load_cases
-
 
 
 def _batch_dir(config: HarnessConfig, batch_name: str) -> Path:
@@ -68,9 +68,7 @@ async def run_eval_batch(
                 profile_name=profile,
                 model_override=model,
                 reasoning_override=effort,
-                reference_image=str(case.reference_image)
-                if case.reference_image
-                else None,
+                reference_image=str(case.reference_image) if case.reference_image else None,
                 max_revisions=max_revisions,
             )
         )
@@ -158,16 +156,21 @@ async def _judge_case(
             "feature_checklist": "Use flexible, high-signal criteria implied by case spec.",
         },
     }
-    render_sheet = config.runs_dir / run_name / "revisions" / delivered_revision / "render-sheet.png"
+    render_sheet = (
+        config.runs_dir / run_name / "revisions" / delivered_revision / "render-sheet.png"
+    )
     images = [render_sheet]
     if case.reference_image:
         images.append(case.reference_image)
     result = await Runner.run(
         judge,
-        input=build_single_user_multimodal_message(
-            lead_text="Judge this delivered CAD revision against ground truth.",
-            payload=payload,
-            image_paths=images,
+        input=cast(
+            Any,
+            build_single_user_multimodal_message(
+                lead_text="Judge this delivered CAD revision against ground truth.",
+                payload=payload,
+                image_paths=images,
+            ),
         ),
     )
     return result.final_output

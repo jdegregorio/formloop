@@ -9,7 +9,6 @@ from ..config.profiles import Profile
 from ..schemas import ReviewSummary
 from .common import Agent, build_model_settings, lenient_output
 
-
 REVIEWER_INSTRUCTIONS = """You are the Reviewer specialist in a CAD design harness.
 
 Your primary modality is visual review of CAD renders. Textual signals are

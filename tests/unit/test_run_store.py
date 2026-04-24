@@ -69,12 +69,8 @@ def _make_bundle(tmp: Path, trigger: RevisionTrigger = RevisionTrigger.initial) 
 def test_create_run_allocates_sequential_name(
     store: RunStore, effective_runtime: EffectiveRuntime
 ) -> None:
-    run_a, layout_a = store.create_run(
-        input_summary="cube", effective_runtime=effective_runtime
-    )
-    run_b, layout_b = store.create_run(
-        input_summary="plate", effective_runtime=effective_runtime
-    )
+    run_a, layout_a = store.create_run(input_summary="cube", effective_runtime=effective_runtime)
+    run_b, layout_b = store.create_run(input_summary="plate", effective_runtime=effective_runtime)
     assert run_a.run_name == "run-0001"
     assert run_b.run_name == "run-0002"
     assert layout_a.run_json.is_file()
@@ -85,9 +81,7 @@ def test_create_run_allocates_sequential_name(
     assert events[0].kind == ProgressEventKind.run_created
 
 
-def test_append_event_auto_indexes(
-    store: RunStore, effective_runtime: EffectiveRuntime
-) -> None:
+def test_append_event_auto_indexes(store: RunStore, effective_runtime: EffectiveRuntime) -> None:
     run, _ = store.create_run(input_summary="x", effective_runtime=effective_runtime)
     store.append_event(
         run.run_name,
@@ -133,9 +127,7 @@ def test_append_event_auto_indexes_with_truncated_last_line(
     assert json.loads(layout.events_jsonl.read_text().splitlines()[-1])["index"] == 2
 
 
-def test_read_events_since_filters(
-    store: RunStore, effective_runtime: EffectiveRuntime
-) -> None:
+def test_read_events_since_filters(store: RunStore, effective_runtime: EffectiveRuntime) -> None:
     run, _ = store.create_run(input_summary="x", effective_runtime=effective_runtime)
     for _ in range(3):
         store.append_event(
@@ -214,9 +206,7 @@ def test_attach_review_updates_snapshot(
     assert len(snap.artifacts.view_paths) == 3
 
 
-def test_snapshot_tracks_last_event(
-    store: RunStore, effective_runtime: EffectiveRuntime
-) -> None:
+def test_snapshot_tracks_last_event(store: RunStore, effective_runtime: EffectiveRuntime) -> None:
     run, _ = store.create_run(input_summary="x", effective_runtime=effective_runtime)
     store.append_event(
         run.run_name,
@@ -242,7 +232,9 @@ def test_latest_narration_prefers_highest_index(
     )
     store.append_event(
         run.run_name,
-        ProgressEvent(index=0, kind=ProgressEventKind.narration, phase="review", message="checking"),
+        ProgressEvent(
+            index=0, kind=ProgressEventKind.narration, phase="review", message="checking"
+        ),
     )
 
     snap = store.load_snapshot(run.run_name)

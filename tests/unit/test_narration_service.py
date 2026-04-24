@@ -16,7 +16,6 @@ import pytest
 from formloop.agents.narrator import NarrationInput, NarrationOutput
 from formloop.orchestrator.narrator import Narrator
 
-
 pytestmark = pytest.mark.asyncio
 
 

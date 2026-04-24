@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from ..agents import PromptContext
-from ..schemas import ProgressEventKind, RevisionTrigger, ReviewDecision
+from ..schemas import ProgressEventKind, ReviewDecision, RevisionTrigger
 from ..store.run_store import CandidateBundle
 from .narration import fallback_revision_built
 from .phase_context import OrchestrationPhaseContext, PhaseRuntimeContext
@@ -100,7 +100,11 @@ async def revision_loop_phase(
             run.run_name,
             phase="revision",
             just_completed="finished the CAD build and render",
-            next_step=("send it to review" if cad_out.build_ok and cad_out.render_ok else "retry because the build or render failed"),
+            next_step=(
+                "send it to review"
+                if cad_out.build_ok and cad_out.render_ok
+                else "retry because the build or render failed"
+            ),
             why="",
             signals={
                 "attempt": attempt,
@@ -147,7 +151,9 @@ async def revision_loop_phase(
 
         build_meta = build_dir / "build-metadata.json"
         render_meta = render_dir / "render-metadata.json"
-        inspect_src = _write_inspect_json(runtime.run_root, attempt, runtime.run_ctx.notes.get("last_inspect"))
+        inspect_src = _write_inspect_json(
+            runtime.run_root, attempt, runtime.run_ctx.notes.get("last_inspect")
+        )
 
         bundle = CandidateBundle(
             trigger=RevisionTrigger.initial if attempt == 1 else RevisionTrigger.review_revise,

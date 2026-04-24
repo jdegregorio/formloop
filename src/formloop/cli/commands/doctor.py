@@ -22,9 +22,7 @@ def register(app: typer.Typer) -> None:
 
         py = sys.version_info
         if py < (3, 11):
-            problems.append(
-                f"Python 3.11+ required; detected {py.major}.{py.minor}.{py.micro}"
-            )
+            problems.append(f"Python 3.11+ required; detected {py.major}.{py.minor}.{py.micro}")
         typer.echo(f"python:   {py.major}.{py.minor}.{py.micro}")
 
         cad = locate_cad()
@@ -49,16 +47,12 @@ def register(app: typer.Typer) -> None:
             try:
                 from ...runtime.cad_cli import cad_build
 
-                cube_model = (
-                    repo_root().parent / "cad-cli" / "examples" / "models" / "cube.py"
-                )
+                cube_model = repo_root().parent / "cad-cli" / "examples" / "models" / "cube.py"
                 if cube_model.is_file():
                     out = repo_root() / "var" / ".doctor" / "build"
                     if out.exists():
                         shutil.rmtree(out)
-                    build = cad_build(
-                        model_path=cube_model, output_dir=out, overrides={"size": 5}
-                    )
+                    build = cad_build(model_path=cube_model, output_dir=out, overrides={"size": 5})
                     typer.echo(
                         f"cad build: ok  volume={build.volume:.1f}mm³ "
                         f"bbox={build.bounding_box.size}"

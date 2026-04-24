@@ -39,7 +39,6 @@ from formloop.orchestrator.narrator import Narrator
 from formloop.orchestrator.run_driver import DriveRequest, RunDriver
 from formloop.schemas import ProgressEventKind
 
-
 pytestmark = pytest.mark.asyncio
 
 
@@ -91,9 +90,7 @@ def _install_runner_stub(monkeypatch) -> None:
                         manufacturing_method=None,
                         key_dimension_parameters={"size_mm": 20},
                     ),
-                    assumptions=[
-                        AssumptionProposal(topic="size", assumption="20mm cube")
-                    ],
+                    assumptions=[AssumptionProposal(topic="size", assumption="20mm cube")],
                     research_topics=[],
                     design_brief="A simple 20mm cube.",
                 )
@@ -136,9 +133,7 @@ async def _drive(tmp_path: Path, monkeypatch, narrator: Narrator) -> tuple[Any, 
 
 
 async def test_narration_events_emitted_at_each_milestone(tmp_path, monkeypatch) -> None:
-    result, events = await _drive(
-        tmp_path, monkeypatch, narrator=Narrator(fallback_only=True)
-    )
+    result, events = await _drive(tmp_path, monkeypatch, narrator=Narrator(fallback_only=True))
     narration = [ev for ev in events if ev.kind is ProgressEventKind.narration]
     phases = [ev.phase for ev in narration]
 
@@ -150,8 +145,7 @@ async def test_narration_events_emitted_at_each_milestone(tmp_path, monkeypatch)
     # Fallback strings should be the captured messages (LLM is off).
     assert any("normalized" in ev.message for ev in narration)
     assert any(
-        "build" in ev.message.lower() or "designer" in ev.message.lower()
-        for ev in narration
+        "build" in ev.message.lower() or "designer" in ev.message.lower() for ev in narration
     )
     # Snapshot reflects the latest one.
     snap = driver_snapshot(tmp_path, result["run_name"])
@@ -181,9 +175,7 @@ async def test_narration_inputs_carry_no_identifiers(tmp_path, monkeypatch) -> N
             [payload.phase, payload.just_completed, payload.next_step, payload.why]
         )
         for needle in forbidden_substrings:
-            assert needle not in text_blob, (
-                f"narration payload leaked {needle!r}: {payload!r}"
-            )
+            assert needle not in text_blob, f"narration payload leaked {needle!r}: {payload!r}"
 
 
 async def test_run_survives_narrator_failure(tmp_path, monkeypatch) -> None:

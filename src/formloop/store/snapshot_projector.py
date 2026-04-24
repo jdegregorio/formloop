@@ -33,14 +33,18 @@ class SnapshotProjector:
             snap.artifacts = SnapshotArtifacts(
                 step_path=str(rev_layout.step) if rev_layout.step.is_file() else None,
                 glb_path=str(rev_layout.glb) if rev_layout.glb.is_file() else None,
-                render_sheet_path=str(rev_layout.render_sheet) if rev_layout.render_sheet.is_file() else None,
+                render_sheet_path=str(rev_layout.render_sheet)
+                if rev_layout.render_sheet.is_file()
+                else None,
                 view_paths=[str(p) for p in sorted(rev_layout.views_dir.glob("*.png"))],
             )
             if rev_layout.review_summary.is_file():
                 try:
                     rs = ReviewSummary.model_validate_json(rev_layout.review_summary.read_text())
                     snap.latest_review_decision = rs.decision
-                    snap.latest_review_summary_path = str(rev_layout.review_summary.relative_to(layout.root))
+                    snap.latest_review_summary_path = str(
+                        rev_layout.review_summary.relative_to(layout.root)
+                    )
                 except Exception:
                     pass
 

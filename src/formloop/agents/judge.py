@@ -9,7 +9,6 @@ from ..config.profiles import Profile
 from ..schemas import JudgeOutput
 from .common import Agent, build_model_settings, lenient_output
 
-
 JUDGE_INSTRUCTIONS = """You are the Judge specialist in DEVELOPER EVAL MODE.
 
 Your primary modality is visual review of CAD renders. Deterministic metrics

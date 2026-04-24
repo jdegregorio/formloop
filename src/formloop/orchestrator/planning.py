@@ -41,10 +41,15 @@ async def plan_phase(
         phase="plan",
         just_completed="normalized the spec",
         next_step=(
-            "kick off background research" if plan.research_topics else "hand the spec to the CAD designer"
+            "kick off background research"
+            if plan.research_topics
+            else "hand the spec to the CAD designer"
         ),
         why="",
-        signals={"assumptions": len(plan.assumptions), "research_topics": len(plan.research_topics)},
+        signals={
+            "assumptions": len(plan.assumptions),
+            "research_topics": len(plan.research_topics),
+        },
         context={
             "design_brief": plan.design_brief,
             "assumptions": [

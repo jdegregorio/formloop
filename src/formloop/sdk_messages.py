@@ -5,8 +5,9 @@ from __future__ import annotations
 import base64
 import json
 import mimetypes
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 
 def build_input_image_item(path: Path) -> dict[str, str] | None:

@@ -10,6 +10,7 @@ from .design_researcher import (
     ResearchFinding,
     build_design_researcher,
 )
+from .judge import build_judge
 from .manager import (
     AssumptionProposal,
     ManagerFinalAnswer,
@@ -23,7 +24,6 @@ from .narrator import (
     NarrationOutput,
     build_narrator,
 )
-from .judge import build_judge
 from .reviewer import build_reviewer
 
 __all__ = [

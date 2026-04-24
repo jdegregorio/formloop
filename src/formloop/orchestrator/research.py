@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 
+from ..schemas import ProgressEventKind
 from .narration import fallback_research
 from .phase_context import OrchestrationPhaseContext, PhaseRuntimeContext
-from ..schemas import ProgressEventKind
 
 
 async def research_phase(
@@ -27,7 +27,7 @@ async def research_phase(
     findings: list[dict] = []
     failures = 0
     for topic, res in zip(plan.research_topics, results, strict=True):
-        if isinstance(res, Exception):
+        if isinstance(res, BaseException):
             failures += 1
             findings.append(
                 {"topic": topic, "summary": f"[research failed: {res}]", "citations": []}
@@ -46,7 +46,9 @@ async def research_phase(
         just_completed="finished the research lookups",
         next_step="hand the findings + spec to the CAD designer",
         why=(
-            f"{failures} of {len(findings)} lookups failed but we have enough to proceed" if failures else ""
+            f"{failures} of {len(findings)} lookups failed but we have enough to proceed"
+            if failures
+            else ""
         ),
         signals={"findings": len(findings), "failures": failures},
         context={

@@ -9,16 +9,18 @@ import uuid
 from pathlib import Path
 
 from ..schemas import ArtifactEntry, ArtifactManifest, Revision, Run
+from .candidate_bundle import CandidateBundle
 from .io import atomic_write_text
 from .layout import RevisionLayout, RunLayout
 from .naming import next_revision_name
-from .candidate_bundle import CandidateBundle
 
 
 class RevisionStore:
     """Copy artifact bundles and write revision records."""
 
-    def persist(self, run: Run, layout: RunLayout, bundle: CandidateBundle) -> tuple[Revision, RevisionLayout]:
+    def persist(
+        self, run: Run, layout: RunLayout, bundle: CandidateBundle
+    ) -> tuple[Revision, RevisionLayout]:
         name = next_revision_name(layout.revisions_dir)
         ordinal = len(run.revisions) + 1
         rev_layout = layout.revision(name)
@@ -79,13 +81,33 @@ class RevisionStore:
             ArtifactEntry(role="render_sheet", path="render-sheet.png", format="png"),
         ]
         for view in sorted(rev_layout.views_dir.glob("*.png")):
-            entries.append(ArtifactEntry(role=f"view_{view.stem}", path=f"views/{view.name}", format="png"))
+            entries.append(
+                ArtifactEntry(role=f"view_{view.stem}", path=f"views/{view.name}", format="png")
+            )
         if rev_layout.build_meta.is_file():
-            entries.append(ArtifactEntry(role="build_metadata", path="build-metadata.json", format="json", required=False))
+            entries.append(
+                ArtifactEntry(
+                    role="build_metadata", path="build-metadata.json", format="json", required=False
+                )
+            )
         if rev_layout.render_meta.is_file():
-            entries.append(ArtifactEntry(role="render_metadata", path="render-metadata.json", format="json", required=False))
+            entries.append(
+                ArtifactEntry(
+                    role="render_metadata",
+                    path="render-metadata.json",
+                    format="json",
+                    required=False,
+                )
+            )
         if rev_layout.inspect_summary.is_file():
-            entries.append(ArtifactEntry(role="inspect_summary", path="inspect-summary.json", format="json", required=False))
+            entries.append(
+                ArtifactEntry(
+                    role="inspect_summary",
+                    path="inspect-summary.json",
+                    format="json",
+                    required=False,
+                )
+            )
         return entries
 
     @staticmethod

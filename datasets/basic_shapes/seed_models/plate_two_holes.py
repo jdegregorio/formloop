@@ -13,7 +13,5 @@ def build_model(params: dict, context: object):
     centers = params.get("hole_centers", [[-10.0, 0.0], [10.0, 0.0]])
     shape = Box(width, depth, height)
     for x_value, y_value in centers:
-        shape = shape - Pos(float(x_value), float(y_value), 0.0) * Cylinder(
-            diameter / 2.0, height
-        )
+        shape = shape - Pos(float(x_value), float(y_value), 0.0) * Cylinder(diameter / 2.0, height)
     return shape

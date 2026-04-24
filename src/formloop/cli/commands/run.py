@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from ...config.env import require_openai_key
 from ...config.profiles import HarnessConfig
 from ...orchestrator import drive_run
 from ..run_renderer import make_renderer
@@ -57,9 +58,7 @@ def register(app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -> N
         ] = False,
         no_color: Annotated[
             bool,
-            typer.Option(
-                "--no-color", help="Disable ANSI colors / in-place narration rewrite."
-            ),
+            typer.Option("--no-color", help="Disable ANSI colors / in-place narration rewrite."),
         ] = False,
     ) -> None:
         """Run the harness end-to-end for a single prompt (FLH-F-012, FLH-F-027)."""
@@ -79,18 +78,28 @@ def register(app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -> N
                 color=not no_color,
             )
 
-        result = asyncio.run(
-            drive_run(
-                prompt,
-                config=config,
-                profile=profile,
-                model=model,
-                effort=effort,
-                reference_image=ref,
-                max_revisions=max_revisions,
-                event_hook=renderer,
+        try:
+            require_openai_key()
+        except RuntimeError as exc:
+            typer.echo(f"formloop run failed: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
+        try:
+            result = asyncio.run(
+                drive_run(
+                    prompt,
+                    config=config,
+                    profile=profile,
+                    model=model,
+                    effort=effort,
+                    reference_image=ref,
+                    max_revisions=max_revisions,
+                    event_hook=renderer,
+                )
             )
-        )
+        except Exception as exc:  # noqa: BLE001 -- CLI boundary should not traceback.
+            typer.echo(f"formloop run failed: {type(exc).__name__}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
 
         if not quiet:
             print_run_footer(

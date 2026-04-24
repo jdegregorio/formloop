@@ -153,9 +153,7 @@ def test_narration_continuation_indent_is_constant_across_phases(monkeypatch) ->
     # Regression: the continuation indent used to scale with the phase
     # label length, so `[plan]` and `[revision]` wrapped to DIFFERENT
     # columns and the output looked ragged. It must now be fixed.
-    monkeypatch.setattr(
-        "formloop.cli.run_renderer.terminal_width", lambda *a, **k: 60
-    )
+    monkeypatch.setattr("formloop.cli.run_renderer.terminal_width", lambda *a, **k: 60)
     r, buf = _renderer()
     long_text = (
         "we did a lot of work here and this line is certainly long enough "
@@ -177,11 +175,11 @@ def test_narration_continuation_indent_is_constant_across_phases(monkeypatch) ->
 def test_long_narration_wraps_to_terminal_width(monkeypatch) -> None:
     # Append-only mode must NEVER truncate narrations — terminals can't
     # expand history like the UI can, so the full text has to wrap.
-    monkeypatch.setattr(
-        "formloop.cli.run_renderer.terminal_width", lambda *a, **k: 40
-    )
+    monkeypatch.setattr("formloop.cli.run_renderer.terminal_width", lambda *a, **k: 40)
     r, buf = _renderer()
-    text = "this is a very long narration line that should wrap cleanly across multiple terminal rows"
+    text = (
+        "this is a very long narration line that should wrap cleanly across multiple terminal rows"
+    )
     r(_ev(1, ProgressEventKind.narration, text, phase="plan"))
     lines = buf.getvalue().rstrip("\n").splitlines()
     # The full text must be reconstructable from the wrapped lines.

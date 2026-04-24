@@ -43,6 +43,7 @@ def require_cad_cli() -> None:
 @pytest.fixture(scope="session")
 def require_blender() -> None:
     import os
+
     if os.environ.get("CAD_BLENDER_BIN"):
         return
     if shutil.which("blender") is None:

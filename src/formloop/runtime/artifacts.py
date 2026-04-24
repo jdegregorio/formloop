@@ -21,9 +21,7 @@ def _ensure_under(root: Path, target: Path) -> Path:
     try:
         target_r.relative_to(root_r)
     except ValueError as exc:
-        raise ArtifactPathError(
-            f"path {target_r} escapes allowed root {root_r}"
-        ) from exc
+        raise ArtifactPathError(f"path {target_r} escapes allowed root {root_r}") from exc
     return target_r
 
 

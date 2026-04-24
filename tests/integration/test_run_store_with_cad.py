@@ -19,7 +19,6 @@ from formloop.schemas import (
 from formloop.store import RunStore
 from formloop.store.run_store import CandidateBundle
 
-
 pytestmark = pytest.mark.integration
 
 

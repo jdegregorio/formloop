@@ -63,9 +63,7 @@ def print_run_header(
     width = terminal_width(min_width=60, max_width=120)
     rule = _rule(width, enabled=enabled)
     title = _color("formloop run", BOLD, enabled=enabled)
-    meta = _color(
-        f"profile={profile_name}  model={model}", DIM, enabled=enabled
-    )
+    meta = _color(f"profile={profile_name}  model={model}", DIM, enabled=enabled)
 
     out.write(rule + "\n")
     out.write(f" {title}   {meta}\n")
@@ -117,15 +115,11 @@ def print_run_footer(
 
     if delivered_revision:
         out.write(
-            _color("  Delivered revision: ", BOLD, enabled=enabled)
-            + delivered_revision
-            + "\n"
+            _color("  Delivered revision: ", BOLD, enabled=enabled) + delivered_revision + "\n"
         )
     if artifacts_dir is not None:
         out.write(
-            _color("  Artifacts:          ", BOLD, enabled=enabled)
-            + str(artifacts_dir)
-            + "\n"
+            _color("  Artifacts:          ", BOLD, enabled=enabled) + str(artifacts_dir) + "\n"
         )
 
     if final_answer:

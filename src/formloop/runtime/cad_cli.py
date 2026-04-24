@@ -18,7 +18,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .subprocess import CliError, run_cli
 
-
 # ---------------------------------------------------------------------------
 # Result models — mirror cad_cli.schemas dataclasses.
 # ---------------------------------------------------------------------------
@@ -229,9 +228,7 @@ def _cad_inspect(
     return CadInspectResult.model_validate(payload)
 
 
-def cad_inspect_summary(
-    artifact_path: Path, *, timeout: float | None = None
-) -> CadInspectResult:
+def cad_inspect_summary(artifact_path: Path, *, timeout: float | None = None) -> CadInspectResult:
     return _cad_inspect("summary", artifact_path, timeout=timeout)
 
 
@@ -269,5 +266,3 @@ def cad_compare(
     result = run_cli(cmd, timeout=timeout)
     payload = result.parse_json()
     return CadCompareResult.model_validate(payload)
-
-

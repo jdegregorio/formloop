@@ -18,7 +18,12 @@ class ResearchCitation(BaseModel):
 
 class ResearchFinding(BaseModel):
     topic: str
-    summary: str = Field(description="Comprehensive factual finding usable as design input; include concrete numbers and standard identifiers.")
+    summary: str = Field(
+        description=(
+            "Comprehensive factual finding usable as design input; include concrete "
+            "numbers and standard identifiers."
+        )
+    )
     citations: list[ResearchCitation] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0, default=0.6)
 

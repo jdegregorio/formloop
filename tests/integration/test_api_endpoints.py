@@ -28,7 +28,6 @@ from formloop.schemas import (
 from formloop.store import RunStore
 from formloop.store.run_store import CandidateBundle
 
-
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
 
 
@@ -52,9 +51,7 @@ def _stub_config(tmp_path: Path) -> HarnessConfig:
 def _seed_run_with_revision(store: RunStore, tmp_path: Path):
     run, layout = store.create_run(
         input_summary="seeded",
-        effective_runtime=EffectiveRuntime(
-            profile="dev_test", model="stub", reasoning="low"
-        ),
+        effective_runtime=EffectiveRuntime(profile="dev_test", model="stub", reasoning="low"),
     )
     src = tmp_path / "src"
     src.mkdir()
@@ -133,9 +130,7 @@ async def test_snapshot_and_events_and_artifacts(tmp_path: Path) -> None:
         assert r2.json()["events"] == []  # caught up
 
         # revision metadata
-        r = await client.get(
-            f"/runs/{run.run_name}/revisions/{revision.revision_name}"
-        )
+        r = await client.get(f"/runs/{run.run_name}/revisions/{revision.revision_name}")
         assert r.status_code == 200
         assert r.json()["revision_name"] == revision.revision_name
 
