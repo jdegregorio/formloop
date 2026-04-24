@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from ..agents import RunContext
-from ..agents.cad_designer import CadRevisionResult
+from ..agents.cad_designer import CadSourceResult
 from ..agents.manager import ManagerFinalAnswer, ManagerPlan
 from ..config.profiles import Profile
 from ..schemas import ProgressEventKind, ReviewSummary
@@ -53,7 +53,7 @@ class OrchestrationPhaseContext(Protocol):
 
     async def design_revision(
         self, designer_input: str, run_ctx: RunContext, profile: Profile
-    ) -> CadRevisionResult: ...
+    ) -> CadSourceResult: ...
 
     async def review_revision(
         self,

@@ -9,6 +9,7 @@ import pytest
 
 from formloop.agents import (
     CadRevisionResult,
+    CadSourceResult,
     ManagerFinalAnswer,
     ManagerPlan,
     ResearchFinding,
@@ -55,12 +56,12 @@ def test_design_researcher_has_web_search(profile: Profile) -> None:
     assert "WebSearchTool" in tool_names
 
 
-def test_cad_designer_registers_four_tools(profile: Profile) -> None:
+def test_cad_designer_is_source_only(profile: Profile) -> None:
     agent = build_cad_designer(profile)
-    assert _underlying_type(agent) is CadRevisionResult
-    # Four tools: write_model, build_model_cli, inspect_model, render_model.
+    assert _underlying_type(agent) is CadSourceResult
     tool_names = {getattr(t, "name", t.__class__.__name__) for t in agent.tools}
-    assert {"write_model", "build_model_cli", "inspect_model", "render_model"} <= tool_names
+    assert tool_names == set()
+    assert CadRevisionResult is not CadSourceResult
     assert "bd_warehouse" in agent.instructions
     assert "bd_vslot" in agent.instructions
     assert "py_gearworks" in agent.instructions

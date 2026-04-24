@@ -15,6 +15,7 @@ from formloop.runtime.cad_cli import (
     cad_inspect_summary,
     cad_render,
 )
+from formloop.runtime.subprocess import CliError
 
 pytestmark = pytest.mark.integration
 
@@ -32,6 +33,26 @@ def test_cad_build_cube(require_cad_cli: None, cube_model: Path, tmp_path: Path)
     assert bb.size == pytest.approx([20.0, 20.0, 20.0], abs=1e-3)
     # Volume = 20^3 = 8000
     assert result.volume == pytest.approx(8000.0, rel=1e-3)
+
+
+def test_cad_build_timeout_returns_structured_cli_error(
+    require_cad_cli: None, tmp_path: Path
+) -> None:
+    model = tmp_path / "hang_model.py"
+    model.write_text(
+        "import time\n\n"
+        "def build_model(params: dict, context: object):\n"
+        "    time.sleep(10)\n"
+        "    return None\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(CliError) as exc_info:
+        cad_build(model_path=model, output_dir=tmp_path / "build", timeout=0.1)
+
+    err = exc_info.value
+    assert err.returncode == -1
+    assert "timed out" in str(err)
 
 
 def test_cad_inspect_summary_cube(require_cad_cli: None, cube_model: Path, tmp_path: Path) -> None:

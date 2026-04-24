@@ -45,9 +45,7 @@ async def research_phase(
             )
             continue
         findings.append(res)
-    logger.info(
-        "research phase: complete findings=%d failures=%d", len(findings), failures
-    )
+    logger.info("research phase: complete findings=%d failures=%d", len(findings), failures)
     ctx.emit(
         run.run_name,
         ProgressEventKind.research_completed,

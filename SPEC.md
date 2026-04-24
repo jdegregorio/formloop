@@ -70,7 +70,7 @@ Agents handle the adaptive parts inside that workflow:
 
 - interpreting design intent
 - researching standards or conventions
-- authoring CAD plans and tool calls
+- authoring CAD source and repair responses from harness validation feedback
 - reviewing candidate outputs
 - synthesizing findings into user-facing updates
 
@@ -80,7 +80,8 @@ This keeps the core run and revision loop controlled by the harness while still 
 
 The specialist roles are intentionally small:
 
-- **CAD Designer** owns CAD authoring, artifact-oriented `cad-cli` usage, and revision execution.
+- **CAD Designer** owns CAD source authoring. The harness owns artifact-oriented
+  `cad-cli` build, inspect, render, validation retry feedback, and revision execution.
 - **Design Researcher** owns external factual research and uses OpenAI search-enabled requests when web research is needed.
 - **Reviewer** owns normal design-loop review against the current spec, artifacts, and optional reference image.
 - **Judge** owns developer-eval judgment against ground-truth data plus deterministic metrics.

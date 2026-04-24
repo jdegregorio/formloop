@@ -25,7 +25,7 @@ from agents import (  # noqa: F401 -- re-exported for the rest of the package
 )
 from openai.types.shared import Reasoning
 
-from ..config.profiles import Profile
+from ..config.profiles import Profile, Timeouts
 from ..schemas import AssumptionRecord
 
 
@@ -60,6 +60,7 @@ class RunContext:
     run_root: Path
     source_dir: Path
     profile: Profile
+    timeouts: Timeouts
     assumptions: list[AssumptionRecord] = field(default_factory=list)
     research_topics: list[str] = field(default_factory=list)
     notes: dict[str, Any] = field(default_factory=dict)
