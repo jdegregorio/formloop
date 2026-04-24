@@ -3,7 +3,7 @@
 REQ: FLH-D-007, FLH-D-008, FLH-D-009, FLH-D-010
 """
 
-from .cad_designer import CadRevisionResult, build_cad_designer
+from .cad_designer import CadRevisionResult, CadSourceResult, build_cad_designer
 from .common import PromptContext, RunContext, Runner
 from .design_researcher import (
     ResearchCitation,
@@ -29,6 +29,7 @@ from .reviewer import build_reviewer
 __all__ = [
     "AssumptionProposal",
     "CadRevisionResult",
+    "CadSourceResult",
     "DEFAULT_NARRATOR_PROFILE",
     "ManagerFinalAnswer",
     "ManagerPlan",

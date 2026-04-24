@@ -8,6 +8,7 @@ REQ: FLH-D-025
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import json
 import logging
@@ -92,6 +93,7 @@ class RunDriver:
             run_root=layout.root,
             source_dir=source_dir,
             profile=profile,
+            timeouts=self.config.timeouts,
         )
         return run, run_ctx, profile, max_revisions
 
@@ -274,41 +276,80 @@ class RunDriver:
 
     async def plan(self, prompt: str, profile: Profile):
         agent = build_manager_plan(profile)
-        result = await Runner.run(
-            agent,
-            input=(
-                f"User prompt:\n{prompt}\n\n"
-                "Return a ManagerPlan normalizing this into a concrete spec."
+        start = time.monotonic()
+        logger.info("agent start: manager_planner timeout=%ss", self.config.timeouts.agent_run)
+        result = await asyncio.wait_for(
+            Runner.run(
+                agent,
+                input=(
+                    f"User prompt:\n{prompt}\n\n"
+                    "Return a ManagerPlan normalizing this into a concrete spec."
+                ),
             ),
+            timeout=self.config.timeouts.agent_run,
         )
+        logger.info("agent end: manager_planner elapsed=%.2fs", time.monotonic() - start)
         return result.final_output
 
     async def research_topic(self, topic: str, profile: Profile) -> dict[str, Any]:
         researcher = build_design_researcher(profile)
-        result = await Runner.run(researcher, input=topic)
+        start = time.monotonic()
+        logger.info(
+            "agent start: design_researcher timeout=%ss topic=%r",
+            self.config.timeouts.agent_run,
+            topic[:160],
+        )
+        result = await asyncio.wait_for(
+            Runner.run(researcher, input=topic),
+            timeout=self.config.timeouts.agent_run,
+        )
+        logger.info(
+            "agent end: design_researcher elapsed=%.2fs topic=%r",
+            time.monotonic() - start,
+            topic[:160],
+        )
         return result.final_output.model_dump()
 
     async def design_revision(self, designer_input: str, run_ctx: RunContext, profile: Profile):
         designer_agent = build_cad_designer(profile)
-        result = await Runner.run(
-            designer_agent, input=designer_input, context=run_ctx, max_turns=24
+        start = time.monotonic()
+        logger.info(
+            "agent start: cad_designer timeout=%ss max_turns=6",
+            self.config.timeouts.agent_run,
         )
+        result = await asyncio.wait_for(
+            Runner.run(designer_agent, input=designer_input, context=run_ctx, max_turns=6),
+            timeout=self.config.timeouts.agent_run,
+        )
+        logger.info("agent end: cad_designer elapsed=%.2fs", time.monotonic() - start)
         return result.final_output
 
     async def review_revision(self, payload: list[dict[str, Any]], profile: Profile):
         reviewer = build_reviewer(profile)
-        result = await Runner.run(reviewer, input=cast(Any, payload))
+        start = time.monotonic()
+        logger.info("agent start: reviewer timeout=%ss", self.config.timeouts.agent_run)
+        result = await asyncio.wait_for(
+            Runner.run(reviewer, input=cast(Any, payload)),
+            timeout=self.config.timeouts.agent_run,
+        )
+        logger.info("agent end: reviewer elapsed=%.2fs", time.monotonic() - start)
         return result.final_output
 
     async def finalize(self, payload: dict[str, Any], profile: Profile) -> ManagerFinalAnswer:
         agent = build_manager_final(profile)
-        result = await Runner.run(
-            agent,
-            input=(
-                "Synthesize the final user-facing answer. Payload:\n\n"
-                + json.dumps(payload, indent=2, default=str)
+        start = time.monotonic()
+        logger.info("agent start: manager_final timeout=%ss", self.config.timeouts.agent_run)
+        result = await asyncio.wait_for(
+            Runner.run(
+                agent,
+                input=(
+                    "Synthesize the final user-facing answer. Payload:\n\n"
+                    + json.dumps(payload, indent=2, default=str)
+                ),
             ),
+            timeout=self.config.timeouts.agent_run,
         )
+        logger.info("agent end: manager_final elapsed=%.2fs", time.monotonic() - start)
         return result.final_output
 
 
