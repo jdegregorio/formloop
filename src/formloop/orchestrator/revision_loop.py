@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from ..agents import PromptContext
@@ -9,6 +10,8 @@ from ..store.run_store import CandidateBundle
 from .narration import fallback_revision_built
 from .phase_context import OrchestrationPhaseContext, PhaseRuntimeContext
 from .review import review_phase
+
+logger = logging.getLogger(__name__)
 
 
 def _staging_views_dir(run_root: Path, attempt: int) -> Path:
@@ -51,6 +54,7 @@ async def revision_loop_phase(
     delivered: str | None = None
 
     for attempt in range(1, max_revisions + 1):
+        logger.info("revision attempt: %d/%d", attempt, max_revisions)
         ctx.emit(
             run.run_name,
             ProgressEventKind.revision_started,
@@ -85,6 +89,19 @@ async def revision_loop_phase(
             "Author model.py, build, inspect, render, then return CadRevisionResult."
         )
         cad_out = await ctx.design_revision(designer_input, runtime.run_ctx, runtime.profile)
+        logger.info(
+            "revision built: attempt=%d build=%s render=%s inspect=%s",
+            attempt,
+            cad_out.build_ok,
+            cad_out.render_ok,
+            cad_out.inspect_ok,
+        )
+        if cad_out.build_errors:
+            logger.warning(
+                "revision build errors: attempt=%d errors=%s",
+                attempt,
+                list(cad_out.build_errors)[:3],
+            )
         ctx.emit(
             run.run_name,
             ProgressEventKind.revision_built,

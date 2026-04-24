@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from ..schemas import ProgressEventKind, ReviewDecision
 from ..sdk_messages import build_single_user_multimodal_message
 from .narration import fallback_review
 from .phase_context import OrchestrationPhaseContext, PhaseRuntimeContext
+
+logger = logging.getLogger(__name__)
 
 
 def _read_source_excerpt(path: Path, *, max_chars: int = 20000) -> str:
@@ -26,6 +29,7 @@ async def review_phase(
     revision,
 ):
     run = runtime.run
+    logger.info("review phase: start revision=%s", revision.revision_name)
     ctx.emit(
         run.run_name,
         ProgressEventKind.review_started,
@@ -60,6 +64,12 @@ async def review_phase(
     )
     fresh = ctx.load_run(run.run_name)
     ctx.attach_review(fresh, revision.revision_name, review)
+    logger.info(
+        "review decision: revision=%s decision=%s confidence=%s",
+        revision.revision_name,
+        review.decision.value,
+        review.confidence,
+    )
     ctx.emit(
         run.run_name,
         ProgressEventKind.review_completed,
