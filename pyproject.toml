@@ -18,8 +18,7 @@ dependencies = [
   "httpx>=0.27.0,<1.0.0",
   "cad-cli",
   "bd_warehouse @ git+https://github.com/gumyr/bd_warehouse.git",
-  "bd_beams_and_bars @ git+https://gitlab.com/experimentslabs/3d/bd_beams_and_bars.git",
-  "bd_vslot @ git+https://github.com/gumyr/bd_vslot.git",
+  "bd-vslot>=0.0.2,<0.1.0",
   "py_gearworks @ git+https://github.com/GarryBGoode/py_gearworks.git",
 ]
 
@@ -40,6 +39,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/formloop"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.uv.sources]
 cad-cli = { path = "../cad-cli", editable = true }

@@ -56,9 +56,7 @@ def register(ui_app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -
         deadline = time.monotonic() + 8.0
         while time.monotonic() < deadline:
             if port_open(config.api.host, config.api.port):
-                typer.echo(
-                    f"started pid={proc.pid} http://{config.api.host}:{config.api.port}"
-                )
+                typer.echo(f"started pid={proc.pid} http://{config.api.host}:{config.api.port}")
                 return
             time.sleep(0.25)
         typer.echo(

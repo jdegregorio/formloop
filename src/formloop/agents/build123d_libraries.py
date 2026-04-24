@@ -4,7 +4,6 @@ from __future__ import annotations
 
 AVAILABLE_BUILD123D_LIBRARIES: tuple[str, ...] = (
     "bd_warehouse",
-    "bd_beams_and_bars",
     "bd_vslot",
     "py_gearworks",
 )

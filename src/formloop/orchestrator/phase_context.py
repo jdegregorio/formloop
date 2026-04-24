@@ -51,7 +51,9 @@ class OrchestrationPhaseContext(Protocol):
 
     async def research_topic(self, topic: str, profile: Profile) -> dict[str, Any]: ...
 
-    async def design_revision(self, designer_input: str, run_ctx: RunContext, profile: Profile) -> CadRevisionResult: ...
+    async def design_revision(
+        self, designer_input: str, run_ctx: RunContext, profile: Profile
+    ) -> CadRevisionResult: ...
 
     async def review_revision(
         self,

@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field
 from ..config.profiles import Profile
 from .common import Agent, build_model_settings, lenient_output
 
-
 # Default profile for the Narrator. Pinned to a cheap reasoning model so
 # the run's main profile can be heavyweight without inflating narration
 # cost. Overridable for tests / future reconfiguration.

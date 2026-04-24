@@ -5,7 +5,7 @@ REQ: FLH-D-021, FLH-D-022
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -27,4 +27,4 @@ class SchemaModel(BaseModel):
 def utcnow_iso() -> str:
     """Return an ISO-8601 UTC timestamp with second precision."""
 
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()

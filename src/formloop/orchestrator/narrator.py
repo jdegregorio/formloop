@@ -44,7 +44,7 @@ class Narrator:
         self._agent: Any | None = None if fallback_only else build_narrator(profile)
 
     @classmethod
-    def auto(cls, *, profile: Profile | None = None) -> "Narrator":
+    def auto(cls, *, profile: Profile | None = None) -> Narrator:
         """Choose ``fallback_only`` automatically based on the environment.
 
         Used by the CLI / API entry points so a missing ``OPENAI_API_KEY``
@@ -55,9 +55,7 @@ class Narrator:
             return cls(fallback_only=True)
         return cls(profile=profile)
 
-    async def narrate(
-        self, payload: NarrationInput, *, fallback: str
-    ) -> tuple[str, str | None]:
+    async def narrate(self, payload: NarrationInput, *, fallback: str) -> tuple[str, str | None]:
         """Return ``(text, error)`` for one milestone.
 
         ``error`` is ``None`` on success and a short string when the
@@ -71,7 +69,7 @@ class Narrator:
                 Runner.run(self._agent, input=payload.model_dump_json()),
                 timeout=self.timeout_seconds,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return fallback, f"timeout after {self.timeout_seconds:.1f}s"
         except Exception as exc:  # noqa: BLE001 -- never abort the run
             return fallback, f"{type(exc).__name__}: {exc}"[:200]

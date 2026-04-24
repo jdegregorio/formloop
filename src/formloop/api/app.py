@@ -79,9 +79,7 @@ def create_app(config: HarnessConfig | None = None) -> FastAPI:
         )
 
     @app.get("/runs/{run_name}/events")
-    def get_events(
-        run_name: str, since: int = Query(default=0, ge=0)
-    ) -> JSONResponse:
+    def get_events(run_name: str, since: int = Query(default=0, ge=0)) -> JSONResponse:
         events = [e.model_dump() for e in store.read_events(run_name, since=since)]
         return JSONResponse({"events": events, "next_since": _next_since(events, since)})
 
@@ -146,14 +144,12 @@ _ROLE_PATHS = {
 }
 
 
-def _resolve_artifact(
-    cfg: HarnessConfig, run_name: str, rev_name: str, role: str
-) -> Path | None:
+def _resolve_artifact(cfg: HarnessConfig, run_name: str, rev_name: str, role: str) -> Path | None:
     base = cfg.runs_dir / run_name / "revisions" / rev_name
     if role in _ROLE_PATHS:
         return base / _ROLE_PATHS[role]
     if role.startswith("view_"):
-        return base / "views" / f"{role[len('view_'):]}.png"
+        return base / "views" / f"{role[len('view_') :]}.png"
     return None
 
 

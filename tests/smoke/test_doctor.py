@@ -13,7 +13,6 @@ from typer.testing import CliRunner
 
 from formloop.cli import app
 
-
 runner = CliRunner()
 
 pytestmark = pytest.mark.smoke

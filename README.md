@@ -41,9 +41,11 @@ Build123D-native approaches plus these installed helper libraries when
 appropriate:
 
 - `bd_warehouse`
-- `bd_beams_and_bars`
 - `bd_vslot`
 - `py_gearworks`
+
+`bd_beams_and_bars` is not bundled in the default Python 3.12 environment
+because its upstream package currently requires Python 3.13.
 
 During planning/research, manager-generated research topics may include both
 engineering/standards questions and Build123D implementation-method questions

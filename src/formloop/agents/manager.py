@@ -65,9 +65,7 @@ class ManagerPlan(BaseModel):
     """Structured plan the manager produces at the start of a run (FLH-F-001)."""
 
     normalized_spec: NormalizedSpec = Field(
-        description=(
-            "Machine-readable design spec using the structured NormalizedSpec contract."
-        )
+        description=("Machine-readable design spec using the structured NormalizedSpec contract.")
     )
     assumptions: list[AssumptionProposal] = Field(
         default_factory=list,

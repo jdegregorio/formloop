@@ -41,7 +41,5 @@ def test_missing_executable_becomes_cli_error() -> None:
 
 
 def test_does_not_raise_when_check_false() -> None:
-    r = run_cli(
-        [sys.executable, "-c", "import sys; sys.exit(3)"], check=False
-    )
+    r = run_cli([sys.executable, "-c", "import sys; sys.exit(3)"], check=False)
     assert r.returncode == 3

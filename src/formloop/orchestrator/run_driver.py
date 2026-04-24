@@ -10,10 +10,20 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, cast
 
-from ..agents import NarrationInput, RunContext, Runner, build_cad_designer, build_design_researcher, build_manager_final, build_manager_plan, build_reviewer
+from ..agents import (
+    NarrationInput,
+    RunContext,
+    Runner,
+    build_cad_designer,
+    build_design_researcher,
+    build_manager_final,
+    build_manager_plan,
+    build_reviewer,
+)
 from ..agents.manager import ManagerFinalAnswer
 from ..config.profiles import HarnessConfig, Profile
 from ..schemas import AgentAnswer, EffectiveRuntime, ProgressEvent, ProgressEventKind, RunStatus
@@ -58,7 +68,7 @@ class RunDriver:
             profile = dataclasses.replace(
                 profile,
                 model=request.model_override or profile.model,
-                reasoning=request.reasoning_override or profile.reasoning,
+                reasoning=cast(Any, request.reasoning_override or profile.reasoning),
             )
         max_revisions = request.max_revisions or self.config.max_revisions
         run, layout = self.store.create_run(
@@ -90,9 +100,13 @@ class RunDriver:
             user_prompt=request.prompt,
         )
 
-    async def continue_run(self, *, run, run_ctx: RunContext, profile: Profile, max_revisions: int, user_prompt: str) -> dict[str, Any]:
+    async def continue_run(
+        self, *, run, run_ctx: RunContext, profile: Profile, max_revisions: int, user_prompt: str
+    ) -> dict[str, Any]:
         delivered_rev_name: str | None = None
-        runtime = PhaseRuntimeContext(run=run, run_ctx=run_ctx, profile=profile, user_prompt=user_prompt)
+        runtime = PhaseRuntimeContext(
+            run=run, run_ctx=run_ctx, profile=profile, user_prompt=user_prompt
+        )
         try:
             plan = await plan_phase(self, runtime)
             findings = await research_phase(self, runtime, plan=plan)
@@ -105,7 +119,9 @@ class RunDriver:
             )
             final = await self._finalize(run, plan, delivered_rev_name, profile)
             run = self.store.load_run(run.run_name)
-            run.final_answer = AgentAnswer(text=final.text, delivered_revision_name=delivered_rev_name)
+            run.final_answer = AgentAnswer(
+                text=final.text, delivered_revision_name=delivered_rev_name
+            )
             run.status = RunStatus.succeeded if delivered_rev_name else RunStatus.failed
             if not delivered_rev_name:
                 run.status_detail = "no revision bundle was delivered"
@@ -137,21 +153,41 @@ class RunDriver:
             "final_answer": run.final_answer.text if run.final_answer else None,
         }
 
-    async def _finalize(self, run, plan, delivered_rev_name: str | None, profile: Profile) -> ManagerFinalAnswer:
+    async def _finalize(
+        self, run, plan, delivered_rev_name: str | None, profile: Profile
+    ) -> ManagerFinalAnswer:
         fresh = self.store.load_run(run.run_name)
         snap = self.store.load_snapshot(run.run_name)
         payload = {
             "spec": plan.normalized_spec.model_dump(),
             "delivered_revision": delivered_rev_name,
             "revisions": fresh.revisions,
-            "latest_review_decision": (snap.latest_review_decision.value if snap.latest_review_decision else None),
+            "latest_review_decision": (
+                snap.latest_review_decision.value if snap.latest_review_decision else None
+            ),
             "assumptions": [a.model_dump() for a in fresh.assumptions],
         }
         return await self.finalize(payload, profile)
 
     # phase context interface
-    def emit(self, run_name: str, kind: ProgressEventKind, message: str, *, data: dict | None = None, phase: str | None = None, narration_error: str | None = None) -> None:
-        event = ProgressEvent(index=0, kind=kind, message=message, phase=phase, narration_error=narration_error, data=data or {})
+    def emit(
+        self,
+        run_name: str,
+        kind: ProgressEventKind,
+        message: str,
+        *,
+        data: dict | None = None,
+        phase: str | None = None,
+        narration_error: str | None = None,
+    ) -> None:
+        event = ProgressEvent(
+            index=0,
+            kind=kind,
+            message=message,
+            phase=phase,
+            narration_error=narration_error,
+            data=data or {},
+        )
         written = self.store.append_event(run_name, event)
         if self._event_hook is not None:
             try:
@@ -159,7 +195,18 @@ class RunDriver:
             except Exception:
                 pass
 
-    async def narrate(self, run_name: str, *, phase: str, just_completed: str, next_step: str, why: str, signals: dict[str, Any], fallback: str, context: dict[str, Any] | None = None) -> None:
+    async def narrate(
+        self,
+        run_name: str,
+        *,
+        phase: str,
+        just_completed: str,
+        next_step: str,
+        why: str,
+        signals: dict[str, Any],
+        fallback: str,
+        context: dict[str, Any] | None = None,
+    ) -> None:
         payload = NarrationInput(
             phase=phase,
             just_completed=just_completed,
@@ -214,19 +261,24 @@ class RunDriver:
 
     async def design_revision(self, designer_input: str, run_ctx: RunContext, profile: Profile):
         designer_agent = build_cad_designer(profile)
-        result = await Runner.run(designer_agent, input=designer_input, context=run_ctx, max_turns=24)
+        result = await Runner.run(
+            designer_agent, input=designer_input, context=run_ctx, max_turns=24
+        )
         return result.final_output
 
     async def review_revision(self, payload: list[dict[str, Any]], profile: Profile):
         reviewer = build_reviewer(profile)
-        result = await Runner.run(reviewer, input=payload)
+        result = await Runner.run(reviewer, input=cast(Any, payload))
         return result.final_output
 
     async def finalize(self, payload: dict[str, Any], profile: Profile) -> ManagerFinalAnswer:
         agent = build_manager_final(profile)
         result = await Runner.run(
             agent,
-            input=("Synthesize the final user-facing answer. Payload:\n\n" + json.dumps(payload, indent=2, default=str)),
+            input=(
+                "Synthesize the final user-facing answer. Payload:\n\n"
+                + json.dumps(payload, indent=2, default=str)
+            ),
         )
         return result.final_output
 

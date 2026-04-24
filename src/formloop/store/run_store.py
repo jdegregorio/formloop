@@ -9,7 +9,14 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from ..schemas import EffectiveRuntime, ProgressEvent, ProgressEventKind, ReviewSummary, Run, RunSnapshot
+from ..schemas import (
+    EffectiveRuntime,
+    ProgressEvent,
+    ProgressEventKind,
+    ReviewSummary,
+    Run,
+    RunSnapshot,
+)
 from ..schemas._common import utcnow_iso
 from .candidate_bundle import CandidateBundle
 from .event_log import EventLog

@@ -33,7 +33,9 @@ def test_build_single_user_multimodal_message_orders_text_then_images(tmp_path: 
     assert content[2]["image_url"].endswith(base64.b64encode(b"second-bytes").decode("ascii"))
 
 
-def test_build_single_user_multimodal_message_reports_missing_images_deterministically(tmp_path: Path) -> None:
+def test_build_single_user_multimodal_message_reports_missing_images_deterministically(
+    tmp_path: Path,
+) -> None:
     existing = tmp_path / "exists.png"
     missing_one = tmp_path / "missing-one.png"
     missing_two = tmp_path / "missing-two.png"

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
-from ..sdk_messages import build_single_user_multimodal_message
 from ..schemas import ProgressEventKind, ReviewDecision
+from ..sdk_messages import build_single_user_multimodal_message
 from .narration import fallback_review
 from .phase_context import OrchestrationPhaseContext, PhaseRuntimeContext
 
@@ -16,7 +15,6 @@ def _read_source_excerpt(path: Path, *, max_chars: int = 20000) -> str:
     if len(text) <= max_chars:
         return text
     return text[:max_chars] + "\n\n# [truncated]"
-
 
 
 async def review_phase(
@@ -43,7 +41,9 @@ async def review_phase(
         "review_focus": {
             "primary_modality": "visual",
             "required_images": ["render_sheet", "reference_image_if_present"],
-            "feature_checklist": "Cover all meaningful spec features with flexible checklist items.",
+            "feature_checklist": (
+                "Cover all meaningful spec features with flexible checklist items."
+            ),
         },
     }
     sheet_path = runtime.run_root / "revisions" / revision.revision_name / "render-sheet.png"
@@ -74,16 +74,28 @@ async def review_phase(
         run.run_name,
         phase="review",
         just_completed="finished the review",
-        next_step=("deliver this design" if review.decision == ReviewDecision.pass_ else "iterate on the design"),
+        next_step=(
+            "deliver this design"
+            if review.decision == ReviewDecision.pass_
+            else "iterate on the design"
+        ),
         why="",
         signals={"decision": review.decision.value, "confidence": review.confidence},
         context={
             "decision": review.decision.value,
             "confidence": review.confidence,
             "key_findings": list(review.key_findings or [])[:4],
-            "suspect_features": list(getattr(review, "suspect_or_missing_features", None) or [])[:4],
-            "suspect_dimensions": list(getattr(review, "suspect_dimensions_to_recheck", None) or [])[:4],
-            "revision_instructions": list([getattr(review, "revision_instructions", "")] if getattr(review, "revision_instructions", "") else [])[:1],
+            "suspect_features": list(getattr(review, "suspect_or_missing_features", None) or [])[
+                :4
+            ],
+            "suspect_dimensions": list(
+                getattr(review, "suspect_dimensions_to_recheck", None) or []
+            )[:4],
+            "revision_instructions": list(
+                [getattr(review, "revision_instructions", "")]
+                if getattr(review, "revision_instructions", "")
+                else []
+            )[:1],
         },
         fallback=fallback_review(review),
     )

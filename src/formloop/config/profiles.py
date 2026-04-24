@@ -8,17 +8,20 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, cast
 
 from .env import repo_root
 
 CONFIG_FILENAME = "formloop.harness.toml"
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
+REASONING_EFFORTS: frozenset[str] = frozenset(("none", "minimal", "low", "medium", "high", "xhigh"))
 
 
 @dataclass(frozen=True, slots=True)
 class Profile:
     name: str
     model: str
-    reasoning: str
+    reasoning: ReasoningEffort
     description: str = ""
 
 
@@ -53,9 +56,7 @@ class HarnessConfig:
     def profile(self, name: str | None = None) -> Profile:
         n = name or self.default_profile
         if n not in self.profiles:
-            raise KeyError(
-                f"unknown profile {n!r}; known: {sorted(self.profiles)}"
-            )
+            raise KeyError(f"unknown profile {n!r}; known: {sorted(self.profiles)}")
         return self.profiles[n]
 
 
@@ -67,15 +68,20 @@ def load_config(path: Path | None = None) -> HarnessConfig:
     with cfg_path.open("rb") as fh:
         data = tomllib.load(fh)
 
-    profiles = {
-        name: Profile(
+    profiles: dict[str, Profile] = {}
+    for name, entry in data.get("profiles", {}).items():
+        reasoning = str(entry["reasoning"])
+        if reasoning not in REASONING_EFFORTS:
+            raise ValueError(
+                f"profile {name!r} has unsupported reasoning={reasoning!r}; "
+                f"expected one of {sorted(REASONING_EFFORTS)}"
+            )
+        profiles[name] = Profile(
             name=name,
             model=str(entry["model"]),
-            reasoning=str(entry["reasoning"]),
+            reasoning=cast(ReasoningEffort, reasoning),
             description=str(entry.get("description", "")),
         )
-        for name, entry in data.get("profiles", {}).items()
-    }
 
     if not profiles:
         raise ValueError(f"{cfg_path} must define at least one profile under [profiles.*]")
@@ -99,9 +105,7 @@ def load_config(path: Path | None = None) -> HarnessConfig:
 
     default_profile = str(data.get("default_profile", "normal"))
     if default_profile not in profiles:
-        raise ValueError(
-            f"default_profile={default_profile!r} not defined in [profiles.*]"
-        )
+        raise ValueError(f"default_profile={default_profile!r} not defined in [profiles.*]")
 
     return HarnessConfig(
         default_profile=default_profile,

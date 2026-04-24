@@ -16,13 +16,10 @@ from formloop.runtime.cad_cli import (
     cad_render,
 )
 
-
 pytestmark = pytest.mark.integration
 
 
-def test_cad_build_cube(
-    require_cad_cli: None, cube_model: Path, tmp_path: Path
-) -> None:
+def test_cad_build_cube(require_cad_cli: None, cube_model: Path, tmp_path: Path) -> None:
     out = tmp_path / "build"
     result = cad_build(model_path=cube_model, output_dir=out, overrides={"size": 20})
     assert result.status == "ok"
@@ -37,9 +34,7 @@ def test_cad_build_cube(
     assert result.volume == pytest.approx(8000.0, rel=1e-3)
 
 
-def test_cad_inspect_summary_cube(
-    require_cad_cli: None, cube_model: Path, tmp_path: Path
-) -> None:
+def test_cad_inspect_summary_cube(require_cad_cli: None, cube_model: Path, tmp_path: Path) -> None:
     out = tmp_path / "build"
     build = cad_build(model_path=cube_model, output_dir=out, overrides={"size": 10})
     summary = cad_inspect_summary(build.step_path)
@@ -65,9 +60,7 @@ def test_cad_render_cube(
         assert view.is_file(), f"missing view {view}"
 
 
-def test_cad_compare_identical(
-    require_cad_cli: None, cube_model: Path, tmp_path: Path
-) -> None:
+def test_cad_compare_identical(require_cad_cli: None, cube_model: Path, tmp_path: Path) -> None:
     left = tmp_path / "a"
     right = tmp_path / "b"
     cmp_dir = tmp_path / "cmp"

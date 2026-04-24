@@ -95,11 +95,7 @@ def _format_value(value: object) -> str:
     if isinstance(value, list):
         return "[" + ", ".join(_format_value(v) for v in value) + "]"
     if isinstance(value, dict):
-        return (
-            "{"
-            + ", ".join(f"{k}={_format_value(v)}" for k, v in value.items())
-            + "}"
-        )
+        return "{" + ", ".join(f"{k}={_format_value(v)}" for k, v in value.items()) + "}"
     return str(value)
 
 
@@ -242,7 +238,7 @@ class EventRenderer:
         # the first line gets the bold treatment — bolding across newlines
         # would bleed ANSI into terminals that don't reset per-line.
         if wrapped.startswith(initial_spaces):
-            wrapped = colored_prefix + wrapped[len(initial_spaces):]
+            wrapped = colored_prefix + wrapped[len(initial_spaces) :]
         first, sep, rest = wrapped.partition("\n")
         line = self._color(BOLD, first)
         if rest:
@@ -270,9 +266,7 @@ class EventRenderer:
             return
         if kind is ProgressEventKind.research_started:
             topics = event.data.get("topics") or []
-            count = len(topics) if isinstance(topics, list) else event.data.get(
-                "count", 0
-            )
+            count = len(topics) if isinstance(topics, list) else event.data.get("count", 0)
             text = f"researching {count} topic{'s' if count != 1 else ''}"
             self._render_milestone_line(text, width=width)
             if isinstance(topics, list) and topics:
@@ -288,9 +282,7 @@ class EventRenderer:
             return
         if kind is ProgressEventKind.revision_started:
             attempt = event.data.get("attempt")
-            label = (
-                f"revision attempt {attempt}" if attempt else (event.message or "revision")
-            )
+            label = f"revision attempt {attempt}" if attempt else (event.message or "revision")
             self._render_milestone_line(label, width=width)
             return
         if kind is ProgressEventKind.revision_built:
@@ -302,8 +294,10 @@ class EventRenderer:
                 parts.append(f"render={'ok' if data['render_ok'] else 'FAIL'}")
             if "inspect_ok" in data:
                 parts.append(f"inspect={'ok' if data['inspect_ok'] else 'FAIL'}")
-            text = "designer returned " + " ".join(parts) if parts else (
-                event.message or "designer returned"
+            text = (
+                "designer returned " + " ".join(parts)
+                if parts
+                else (event.message or "designer returned")
             )
             self._render_milestone_line(text, width=width)
             dims = data.get("dimensions")
@@ -312,9 +306,7 @@ class EventRenderer:
                 # ragged wrap we got when cramming everything onto one
                 # overlong line.
                 for k, v in list(dims.items())[:8]:
-                    self._render_indent_line(
-                        f"{k} = {_format_value(v)}", width=width
-                    )
+                    self._render_indent_line(f"{k} = {_format_value(v)}", width=width)
             return
         if kind is ProgressEventKind.revision_persisted:
             rev = event.data.get("revision") or event.message
@@ -329,12 +321,10 @@ class EventRenderer:
             decision = event.data.get("decision") or "?"
             confidence = event.data.get("confidence")
             text = f"review decision: {decision}"
-            if isinstance(confidence, (int, float)):
+            if isinstance(confidence, int | float):
                 text += f" (confidence {confidence:.2f})"
             decorated = (
-                self._color(GREEN, text)
-                if decision == "pass"
-                else self._color(YELLOW, text)
+                self._color(GREEN, text) if decision == "pass" else self._color(YELLOW, text)
             )
             # Render manually so we keep the milestone marker but use a
             # decision-colored body instead of the default dim treatment.
@@ -349,9 +339,7 @@ class EventRenderer:
             if status:
                 text += f" ({status})"
             decorated = (
-                self._color(GREEN, text)
-                if status == "succeeded"
-                else self._color(YELLOW, text)
+                self._color(GREEN, text) if status == "succeeded" else self._color(YELLOW, text)
             )
             self._print(f"  {self._color(DIM, MILESTONE_MARKER)} {decorated}")
             return
@@ -375,9 +363,7 @@ class EventRenderer:
 
     def _render_indent_line(self, text: str, *, width: int) -> None:
         prefix = "      "  # under the milestone marker
-        wrapped = _wrap(
-            text, width=width, initial_indent=prefix, subsequent_indent=prefix + "  "
-        )
+        wrapped = _wrap(text, width=width, initial_indent=prefix, subsequent_indent=prefix + "  ")
         self._print(self._color(DIM, wrapped))
 
     def _render_spec_normalized(self, event: ProgressEvent, *, width: int) -> None:
@@ -391,13 +377,9 @@ class EventRenderer:
             head += f" — {kind_label}"
         meta_bits = []
         if isinstance(assumption_count, int) and assumption_count:
-            meta_bits.append(
-                f"{assumption_count} assumption{'s' if assumption_count != 1 else ''}"
-            )
+            meta_bits.append(f"{assumption_count} assumption{'s' if assumption_count != 1 else ''}")
         if isinstance(research_count, int) and research_count:
-            meta_bits.append(
-                f"{research_count} research topic{'s' if research_count != 1 else ''}"
-            )
+            meta_bits.append(f"{research_count} research topic{'s' if research_count != 1 else ''}")
         if meta_bits:
             head += " (" + ", ".join(meta_bits) + ")"
         self._render_milestone_line(head, width=width)
@@ -409,9 +391,7 @@ class EventRenderer:
         assumption = event.data.get("assumption") or event.message or ""
         text = f"{ASSUMPTION_MARKER} {topic}: {assumption}" if topic else assumption
         prefix = "      "
-        wrapped = _wrap(
-            text, width=width, initial_indent=prefix, subsequent_indent=prefix + "  "
-        )
+        wrapped = _wrap(text, width=width, initial_indent=prefix, subsequent_indent=prefix + "  ")
         self._print(self._color(DIM, wrapped))
 
     # ---- failure / verbose ---------------------------------------------
@@ -429,11 +409,7 @@ class EventRenderer:
 
         # Skip keys we already surfaced in the pretty milestone line.
         skip = {"phase", "signals", "narration_error"}
-        items = [
-            f"{k}={_format_value(v)}"
-            for k, v in event.data.items()
-            if k not in skip
-        ]
+        items = [f"{k}={_format_value(v)}" for k, v in event.data.items() if k not in skip]
         if not items:
             idx = f"idx={event.index:03d}"
             self._print(self._color(DIM, f"      [{idx}]"))

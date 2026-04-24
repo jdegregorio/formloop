@@ -61,6 +61,28 @@ wheels = [
 ]
 
 [[package]]
+name = "bd-vslot"
+version = "0.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "build123d" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f1/76/5186eca214bb6c47b9f54f607f797cb4361690b3e2e439bc9c68a954cdc0/bd_vslot-0.0.2.tar.gz", hash = "sha256:8966ec5f118e67ab05cfd8da2d870231cc47d6371df9415f38da1194db6b197f", size = 7826, upload-time = "2026-01-03T03:50:56.248Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/39/4c/b90c552ff4922f8a7504c59a57966cb55f86a547f3fb611ba0c220a51b97/bd_vslot-0.0.2-py3-none-any.whl", hash = "sha256:0a6697e662cbaac919e08de4e2ec5e02feae74544b2577b0e0f348d381c00ac8", size = 9406, upload-time = "2026-01-03T03:50:55.22Z" },
+]
+
+[[package]]
+name = "bd-warehouse"
+version = "0.2.0"
+source = { git = "https://github.com/gumyr/bd_warehouse.git#13bd8260ec42444eaa852b2697ba373af9227cc5" }
+dependencies = [
+    { name = "build123d" },
+    { name = "typing-extensions" },
+]
+
+[[package]]
 name = "build123d"
 version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
@@ -544,10 +566,13 @@ name = "formloop"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "bd-vslot" },
+    { name = "bd-warehouse" },
     { name = "cad-cli" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "openai-agents" },
+    { name = "py-gearworks" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "typer" },
@@ -564,11 +589,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bd-vslot", specifier = ">=0.0.2,<0.1.0" },
+    { name = "bd-warehouse", git = "https://github.com/gumyr/bd_warehouse.git" },
     { name = "cad-cli", editable = "../cad-cli" },
     { name = "fastapi", specifier = ">=0.115.0,<0.200.0" },
     { name = "httpx", specifier = ">=0.27.0,<1.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.16.0,<2.0.0" },
     { name = "openai-agents", specifier = ">=0.3.0" },
+    { name = "py-gearworks", git = "https://github.com/GarryBGoode/py_gearworks.git" },
     { name = "pydantic", specifier = ">=2.8.0,<3.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.0,<9.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0,<1.0.0" },
@@ -1428,6 +1456,16 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cd/05/0a34433a064256a578f1783a10da6df098ceaa4a57bbeaa96a6c0352786b/pure_eval-0.2.3.tar.gz", hash = "sha256:5f4e983f40564c576c7c8635ae88db5956bb2229d7e9237d03b3c0b0190eaf42", size = 19752, upload-time = "2024-07-21T12:58:21.801Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl", hash = "sha256:1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0", size = 11842, upload-time = "2024-07-21T12:58:20.04Z" },
+]
+
+[[package]]
+name = "py-gearworks"
+version = "0.0.18"
+source = { git = "https://github.com/GarryBGoode/py_gearworks.git#2fc2a13d82a9997a65f30c870498f0bb3be62318" }
+dependencies = [
+    { name = "build123d" },
+    { name = "numpy" },
+    { name = "scipy" },
 ]
 
 [[package]]

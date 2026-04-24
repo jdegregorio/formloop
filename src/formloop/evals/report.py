@@ -34,9 +34,7 @@ def render_report(config: HarnessConfig, batch: str) -> Path:
     lines.append(f"- Cases: {len(summary['cases'])}\n")
 
     lines.append("## Results\n")
-    lines.append(
-        "| case_id | status | delivered | overlap_ratio | judge.pass | judge.overall |"
-    )
+    lines.append("| case_id | status | delivered | overlap_ratio | judge.pass | judge.overall |")
     lines.append("|---|---|---|---|---|---|")
     agreements = 0
     total = 0
@@ -45,12 +43,10 @@ def render_report(config: HarnessConfig, batch: str) -> Path:
         metrics = case.get("metrics") or {}
         judge = case.get("judge") or {}
         overlap = metrics.get("overlap_ratio")
-        overlap_s = f"{overlap:.3f}" if isinstance(overlap, (int, float)) else "—"
+        overlap_s = f"{overlap:.3f}" if isinstance(overlap, int | float) else "—"
         judge_pass = judge.get("pass") if "pass" in judge else None
         judge_overall = judge.get("overall_score")
-        overall_s = (
-            f"{judge_overall:.2f}" if isinstance(judge_overall, (int, float)) else "—"
-        )
+        overall_s = f"{judge_overall:.2f}" if isinstance(judge_overall, int | float) else "—"
         pass_s = "✓" if judge_pass else ("✗" if judge_pass is False else "—")
         lines.append(
             f"| {case['case_id']} | {case['status']} | "
@@ -66,9 +62,7 @@ def render_report(config: HarnessConfig, batch: str) -> Path:
     lines.append("")
     lines.append(f"- Judge pass rate: {passes}/{total}" if total else "- No judged cases")
     if total:
-        lines.append(
-            f"- Deterministic-vs-judge agreement: {agreements}/{total}"
-        )
+        lines.append(f"- Deterministic-vs-judge agreement: {agreements}/{total}")
 
     out = batch_dir / "batch-report.md"
     out.write_text("\n".join(lines) + "\n")
