@@ -6,10 +6,13 @@ REQ: FLH-D-004, FLH-D-020
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class CliError(RuntimeError):
@@ -67,6 +70,7 @@ def run_cli(
     Raises :class:`CliError` on non-zero exit when ``check`` is True.
     """
 
+    logger.debug("exec: %s cwd=%s timeout=%s", cmd, cwd, timeout)
     try:
         proc = subprocess.run(
             cmd,
@@ -78,6 +82,7 @@ def run_cli(
             check=False,
         )
     except FileNotFoundError as exc:
+        logger.warning("exec not found: %s", cmd[0])
         raise CliError(
             cmd=cmd,
             returncode=127,
@@ -86,6 +91,7 @@ def run_cli(
             message=f"executable not found: {cmd[0]}",
         ) from exc
     except subprocess.TimeoutExpired as exc:
+        logger.warning("exec timeout: %s after %ss", cmd[0], timeout)
         raise CliError(
             cmd=cmd,
             returncode=-1,
@@ -100,7 +106,20 @@ def run_cli(
         stdout=proc.stdout,
         stderr=proc.stderr,
     )
+    logger.debug(
+        "exit: %s rc=%d stdout=%dB stderr=%dB",
+        cmd[0],
+        result.returncode,
+        len(result.stdout),
+        len(result.stderr),
+    )
     if check and result.returncode != 0:
+        logger.warning(
+            "cli error: %s rc=%d stderr=%r",
+            cmd[0],
+            result.returncode,
+            result.stderr[:200],
+        )
         raise CliError(
             cmd=cmd,
             returncode=result.returncode,

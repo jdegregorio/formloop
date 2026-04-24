@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from ..schemas import ProgressEventKind
 from .narration import fallback_research
 from .phase_context import OrchestrationPhaseContext, PhaseRuntimeContext
+
+logger = logging.getLogger(__name__)
 
 
 async def research_phase(
@@ -15,7 +18,9 @@ async def research_phase(
 ) -> list[dict]:
     run = runtime.run
     if not plan.research_topics:
+        logger.info("research phase: skipped (no topics)")
         return []
+    logger.info("research phase: start topics=%d", len(plan.research_topics))
     ctx.emit(
         run.run_name,
         ProgressEventKind.research_started,
@@ -29,11 +34,20 @@ async def research_phase(
     for topic, res in zip(plan.research_topics, results, strict=True):
         if isinstance(res, BaseException):
             failures += 1
+            logger.warning(
+                "research topic failed: topic=%r error=%s: %s",
+                topic,
+                type(res).__name__,
+                res,
+            )
             findings.append(
                 {"topic": topic, "summary": f"[research failed: {res}]", "citations": []}
             )
             continue
         findings.append(res)
+    logger.info(
+        "research phase: complete findings=%d failures=%d", len(findings), failures
+    )
     ctx.emit(
         run.run_name,
         ProgressEventKind.research_completed,

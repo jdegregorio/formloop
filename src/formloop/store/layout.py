@@ -84,6 +84,10 @@ class RunLayout:
         return self.root / "events.jsonl"
 
     @property
+    def log_path(self) -> Path:
+        return self.root / "run.log"
+
+    @property
     def snapshot_json(self) -> Path:
         return self.root / "snapshot.json"
 

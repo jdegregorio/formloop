@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, cast
@@ -26,6 +28,7 @@ from ..agents import (
 )
 from ..agents.manager import ManagerFinalAnswer
 from ..config.profiles import HarnessConfig, Profile
+from ..logging_util import setup_run_logger, teardown_run_logger
 from ..schemas import AgentAnswer, EffectiveRuntime, ProgressEvent, ProgressEventKind, RunStatus
 from ..store import RunStore
 from .narration import sanitize_context
@@ -34,6 +37,8 @@ from .phase_context import PhaseRuntimeContext
 from .planning import plan_phase
 from .research import research_phase
 from .revision_loop import revision_loop_phase
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -107,43 +112,67 @@ class RunDriver:
         runtime = PhaseRuntimeContext(
             run=run, run_ctx=run_ctx, profile=profile, user_prompt=user_prompt
         )
+        log_handler = setup_run_logger(self.store.layout(run.run_name).log_path)
+        start = time.monotonic()
+        logger.info(
+            "run start: name=%s profile=%s model=%s reasoning=%s max_revisions=%d prompt=%r",
+            run.run_name,
+            profile.name,
+            profile.model,
+            profile.reasoning,
+            max_revisions,
+            user_prompt[:200],
+        )
         try:
-            plan = await plan_phase(self, runtime)
-            findings = await research_phase(self, runtime, plan=plan)
-            delivered_rev_name = await revision_loop_phase(
-                self,
-                runtime,
-                plan=plan,
-                findings=findings,
-                max_revisions=max_revisions,
-            )
-            final = await self._finalize(run, plan, delivered_rev_name, profile)
-            run = self.store.load_run(run.run_name)
-            run.final_answer = AgentAnswer(
-                text=final.text, delivered_revision_name=delivered_rev_name
-            )
-            run.status = RunStatus.succeeded if delivered_rev_name else RunStatus.failed
-            if not delivered_rev_name:
-                run.status_detail = "no revision bundle was delivered"
-            self.store.save_run(run)
-            self.emit(
-                run.run_name,
-                ProgressEventKind.delivered,
-                message=f"run {run.run_name} delivered",
-                data={"revision": delivered_rev_name, "status": run.status.value},
-            )
-        except Exception as exc:  # noqa: BLE001
-            run = self.store.load_run(run.run_name)
-            run.status = RunStatus.failed
-            run.status_detail = f"{type(exc).__name__}: {exc}"[:500]
-            self.store.save_run(run)
-            self.emit(
-                run.run_name,
-                ProgressEventKind.run_failed,
-                message=f"run failed: {exc}",
-                data={"error_type": type(exc).__name__},
-            )
-            raise
+            try:
+                plan = await plan_phase(self, runtime)
+                findings = await research_phase(self, runtime, plan=plan)
+                delivered_rev_name = await revision_loop_phase(
+                    self,
+                    runtime,
+                    plan=plan,
+                    findings=findings,
+                    max_revisions=max_revisions,
+                )
+                final = await self._finalize(run, plan, delivered_rev_name, profile)
+                run = self.store.load_run(run.run_name)
+                run.final_answer = AgentAnswer(
+                    text=final.text, delivered_revision_name=delivered_rev_name
+                )
+                run.status = RunStatus.succeeded if delivered_rev_name else RunStatus.failed
+                if not delivered_rev_name:
+                    run.status_detail = "no revision bundle was delivered"
+                self.store.save_run(run)
+                self.emit(
+                    run.run_name,
+                    ProgressEventKind.delivered,
+                    message=f"run {run.run_name} delivered",
+                    data={"revision": delivered_rev_name, "status": run.status.value},
+                )
+                logger.info(
+                    "run end: name=%s status=%s delivered=%s elapsed=%.2fs",
+                    run.run_name,
+                    run.status.value,
+                    delivered_rev_name,
+                    time.monotonic() - start,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.exception(
+                    "run failed: name=%s elapsed=%.2fs", run.run_name, time.monotonic() - start
+                )
+                run = self.store.load_run(run.run_name)
+                run.status = RunStatus.failed
+                run.status_detail = f"{type(exc).__name__}: {exc}"[:500]
+                self.store.save_run(run)
+                self.emit(
+                    run.run_name,
+                    ProgressEventKind.run_failed,
+                    message=f"run failed: {exc}",
+                    data={"error_type": type(exc).__name__},
+                )
+                raise
+        finally:
+            teardown_run_logger(log_handler)
 
         return {
             "run_name": run.run_name,
