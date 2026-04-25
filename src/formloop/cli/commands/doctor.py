@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import shutil
 import sys
+from pathlib import Path
 
 import typer
 
@@ -25,9 +27,19 @@ def register(app: typer.Typer) -> None:
             problems.append(f"Python 3.11+ required; detected {py.major}.{py.minor}.{py.micro}")
         typer.echo(f"python:   {py.major}.{py.minor}.{py.micro}")
 
-        cad = locate_cad()
-        typer.echo(f"cad:      {cad}")
-        if cad is None:
+        try:
+            cad = locate_cad()
+            typer.echo(f"cad:      {cad}")
+            cad_path = Path(cad).resolve()
+            prefix_path = Path(sys.prefix).resolve()
+            if not cad_path.is_relative_to(prefix_path):
+                problems.append(
+                    f"A stray cad shim shadows the venv-local one. "
+                    f"Found at: {cad}. Expected inside: {sys.prefix}."
+                )
+        except Exception:
+            cad = None
+            typer.echo("cad:      NOT FOUND")
             problems.append("`cad` CLI not found on PATH — run `uv sync` to install cad-cli")
 
         try:
@@ -43,6 +55,19 @@ def register(app: typer.Typer) -> None:
         else:
             typer.echo("openai:   OPENAI_API_KEY present")
 
+        missing_libs = []
+        for lib in ("build123d", "bd_warehouse", "py_gearworks"):
+            try:
+                importlib.import_module(lib)
+            except ImportError:
+                missing_libs.append(lib)
+
+        if not missing_libs:
+            typer.echo("designer libs (formloop venv): ok — bd_warehouse, py_gearworks")
+        else:
+            typer.echo(f"designer libs (formloop venv): FAILED — missing {', '.join(missing_libs)}")
+            problems.append(f"Missing designer libraries in venv: {', '.join(missing_libs)}. Run `uv sync`.")
+
         if cad is not None:
             try:
                 from ...runtime.cad_cli import cad_build
@@ -55,7 +80,8 @@ def register(app: typer.Typer) -> None:
                     build = cad_build(model_path=cube_model, output_dir=out, overrides={"size": 5})
                     typer.echo(
                         f"cad build: ok  volume={build.volume:.1f}mm³ "
-                        f"bbox={build.bounding_box.size}"
+                        f"bbox={build.bounding_box.size} "
+                        f"(--python {sys.executable})"
                     )
                 else:
                     typer.echo(f"cad build: skipped (no cube example at {cube_model})")
