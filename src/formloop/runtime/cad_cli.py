@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -118,8 +119,8 @@ def locate_cad() -> str:
             returncode=127,
             stdout="",
             stderr="",
-            message="`cad` CLI not found on PATH. Install cad-cli: "
-            "`uv tool install <path-to-cad-cli>` or add it to PATH.",
+            message="`cad` CLI not found on PATH. Run `uv sync` to install "
+            "cad-cli into the formloop virtualenv.",
         )
     return path
 
@@ -159,21 +160,43 @@ def _format_overrides(overrides: dict[str, Any] | None) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _formloop_python() -> str:
+    """Return the Python interpreter for model evaluation.
+
+    Defaults to ``sys.executable`` (the formloop venv interpreter) so
+    that build123d, bd_warehouse, and py_gearworks are always visible
+    to ``cad build --python``.
+    """
+
+    return sys.executable
+
+
 def cad_build(
     *,
     model_path: Path,
     output_dir: Path,
     overrides: dict[str, Any] | None = None,
     timeout: float | None = None,
+    python_path: str | None = None,
 ) -> CadBuildResult:
-    """Invoke ``cad build`` and return the parsed result."""
+    """Invoke ``cad build`` and return the parsed result.
 
+    ``python_path`` is passed as ``--python`` to ``cad build`` so the
+    model source is evaluated inside the specified interpreter.  When
+    *None* (the default), :func:`_formloop_python` resolves to the
+    current ``sys.executable``, keeping test-env and build-env the
+    same by construction.
+    """
+
+    effective_python = python_path or _formloop_python()
     cmd: list[str] = [
         locate_cad(),
         "build",
         str(model_path),
         "--output-dir",
         str(output_dir),
+        "--python",
+        effective_python,
         "--format",
         "json",
     ]

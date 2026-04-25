@@ -28,7 +28,7 @@ def register(app: typer.Typer) -> None:
         cad = locate_cad()
         typer.echo(f"cad:      {cad}")
         if cad is None:
-            problems.append("`cad` CLI not found on PATH — install cad-cli editable")
+            problems.append("`cad` CLI not found on PATH — run `uv sync` to install cad-cli")
 
         try:
             blender = locate_blender()
