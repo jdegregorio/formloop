@@ -260,3 +260,59 @@ async def test_run_driver_coordinates_phase_functions(tmp_path, monkeypatch) -> 
     result = await driver.run(DriveRequest(prompt="a 20mm cube"))
     assert calls == ["plan", "research", "revision"]
     assert result["status"] == "failed"
+
+
+async def test_run_driver_reports_failed_when_revisions_persisted_without_pass(
+    tmp_path, monkeypatch
+) -> None:
+    """Persisted-but-unreviewed revisions must not be reported as a success.
+
+    The revision loop returns ``None`` when no revision passed review; the
+    driver must surface ``failed`` and a status_detail that names the
+    unresolved review (not the misleading 'no revision bundle was delivered').
+    """
+
+    _install_runner_stub(monkeypatch)
+    config = _stub_config(tmp_path)
+    driver = RunDriver(config, narrator=Narrator(fallback_only=True))
+
+    async def fake_plan(ctx, runtime):
+        return ManagerPlan(
+            normalized_spec=NormalizedSpec(
+                name="cube",
+                type="component",
+                units="mm",
+                design_intent="Simple calibration cube.",
+                features=["Solid cube body"],
+                interfaces=[],
+                constraints=["edge length must be 20 mm"],
+                preferences=[],
+                manufacturing_method=None,
+                key_dimension_parameters={"size_mm": 20},
+            ),
+            assumptions=[],
+            research_topics=[],
+            design_brief="brief",
+        )
+
+    async def fake_research(ctx, runtime, *, plan):
+        return []
+
+    async def fake_revision(ctx, runtime, *, plan, findings, max_revisions):
+        # Simulate a loop that persisted revisions but never got a review pass.
+        run = ctx.load_run(runtime.run.run_name)
+        run.revisions = ["rev-001", "rev-002"]
+        ctx.save_run(run)
+        return None
+
+    monkeypatch.setattr("formloop.orchestrator.run_driver.plan_phase", fake_plan)
+    monkeypatch.setattr("formloop.orchestrator.run_driver.research_phase", fake_research)
+    monkeypatch.setattr("formloop.orchestrator.run_driver.revision_loop_phase", fake_revision)
+
+    result = await driver.run(DriveRequest(prompt="a 20mm cube"))
+    assert result["status"] == "failed"
+    assert result["delivered_revision"] is None
+
+    persisted = driver.store.load_run(result["run_name"])
+    assert persisted.status.value == "failed"
+    assert persisted.status_detail == "2 revision(s) persisted but none passed review"

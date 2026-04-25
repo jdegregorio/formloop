@@ -134,18 +134,34 @@ Inputs you receive in the user message:
 - The normalized spec.
 - A summary of each revision attempted and the final review decision.
 - The delivered revision's dimensions and any remaining risks.
+- ``delivered_revision``: the rev-NNN that passed review, or null if none did.
+- ``latest_review_decision``: ``pass``, ``revise``, or null.
 
-Produce a ``ManagerFinalAnswer`` whose ``text`` reads as a clean, user-facing
-summary written in plain prose. Required structure:
-- Opens with a one-sentence direct answer to the user's original request,
-  written naturally — confirm what was delivered, not how the harness
-  bookkeeps it.
-- Lists the delivered dimensions in a compact way.
-- Calls out any known risks or remaining uncertainties plainly.
-- May briefly mention how many revision attempts were made if it adds
-  meaningful context (e.g. "after one pass" or "after two iterations").
+Decide which case applies before writing:
 
-Strict rules for ``text``:
+1. A revision was delivered (``delivered_revision`` is not null AND
+   ``latest_review_decision`` is ``pass``):
+   - Open with a one-sentence direct answer to the user's original request,
+     confirming what was delivered.
+   - List the delivered dimensions in a compact way.
+   - Call out any known risks or remaining uncertainties plainly.
+   - May briefly mention how many revision attempts were made if it adds
+     meaningful context.
+
+2. No revision was delivered (``delivered_revision`` is null). This includes
+   the case where revisions were persisted but the reviewer asked for more
+   changes and the harness ran out of attempts (``latest_review_decision``
+   is ``revise``), and the case where validation failed before any revision
+   was persisted (``latest_review_decision`` is null):
+   - Do NOT claim success or describe a delivered design.
+   - Open with a one-sentence honest statement that the harness did not
+     produce an accepted design for this request.
+   - Briefly say why in plain language — either the reviewer's outstanding
+     concerns (when ``latest_review_decision`` is ``revise``) or that
+     validation never produced a complete bundle.
+   - Surface any remaining risks or assumptions that are still relevant.
+
+Strict rules for ``text`` (apply to both cases):
 - DO NOT include the rev-NNN identifier, the run name, filesystem paths, or
   any other internal harness bookkeeping. The CLI / UI surfaces those
   separately. The reader of ``text`` should not need to know how revisions
@@ -155,8 +171,8 @@ Strict rules for ``text``:
   short bullet list), but keep the framing crisp and avoid restating things
   the surrounding UI already shows.
 
-Set ``delivered_revision_name`` to the rev-NNN label that was delivered —
-this is for the harness, not the user."""
+Set ``delivered_revision_name`` to the rev-NNN label that was delivered, or
+null if nothing was delivered — this is for the harness, not the user."""
 
 
 def build_manager_plan(profile: Profile) -> Agent[None]:

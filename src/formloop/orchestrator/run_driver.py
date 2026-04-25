@@ -143,7 +143,12 @@ class RunDriver:
                 )
                 run.status = RunStatus.succeeded if delivered_rev_name else RunStatus.failed
                 if not delivered_rev_name:
-                    run.status_detail = "no revision bundle was delivered"
+                    if run.revisions:
+                        run.status_detail = (
+                            f"{len(run.revisions)} revision(s) persisted but none passed review"
+                        )
+                    else:
+                        run.status_detail = "no revision bundle was delivered"
                 self.store.save_run(run)
                 self.emit(
                     run.run_name,

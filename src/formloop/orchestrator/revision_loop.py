@@ -744,7 +744,6 @@ async def revision_loop_phase(
         )
         fresh = ctx.load_run(run.run_name)
         revision, _ = ctx.persist_revision(fresh, bundle)
-        delivered = revision.revision_name
         ctx.emit(
             run.run_name,
             ProgressEventKind.revision_persisted,
@@ -760,6 +759,7 @@ async def revision_loop_phase(
             revision=revision,
         )
         if review.decision == ReviewDecision.pass_:
+            delivered = revision.revision_name
             ctx.emit(run.run_name, ProgressEventKind.breadcrumb, message="revision accepted")
             break
         prior_review = review.model_dump()
