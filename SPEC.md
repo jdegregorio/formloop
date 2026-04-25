@@ -208,6 +208,11 @@ Each eval run should produce:
 
 Formloop owns eval orchestration, scoring policy, aggregation, and failure surfacing even when deterministic geometry operations come from `cad-cli`.
 
+`formloop run` may optionally include an LLM post-mortem stage (`--post-mortem`)
+that reviews the just-completed run's logs, events, validation failures, and
+review outcomes to draft GitHub-issue-style harness optimization requests. The
+post-mortem agent and its outputs live alongside the run, not the eval batch.
+
 ### Critical User and Operator Stories
 
 These stories define the essential v1 behavior:
@@ -227,3 +232,23 @@ The clean mental model is:
 - `cad-cli` performs deterministic CAD work and returns artifacts plus structured JSON.
 
 Formloop should reach `cad-cli` through harness tools and runtime functions rather than quietly re-implementing those operations inside agent prompts or app logic.
+
+#### Single-environment contract
+
+Formloop and `cad-cli` share one Python environment by design. `cad-cli` is a
+pinned pip dependency of formloop (declared in `pyproject.toml`), and every
+`cad build` invocation passes `--python <formloop-venv-python>` so the model
+source is evaluated in the same interpreter that runs the harness. This makes
+"the env we test in" and "the env we build in" the same env by construction:
+designer-advertised libraries (`bd_warehouse`, `py_gearworks`, …) become
+formloop-side dependencies, and `formloop doctor` verifies every advertised
+library is importable in that shared interpreter.
+
+When `cad build` fails, `cad-cli` (v0.1.2+) emits a structured
+`{"error": {"type", "message", "traceback", "cause", "exit_code"}}` payload on
+stderr under `--format json`. Formloop's runtime parses this payload and
+surfaces the full traceback to the CAD Designer in `CadFailureFeedback.detail`,
+so source-repair turns see the actual failing line rather than a single-line
+message. There is no separate pre-build syntax/import gate — `cad build` is the
+syntax/import/run check, and full traceback feedback is what makes one
+subprocess sufficient.

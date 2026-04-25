@@ -34,7 +34,9 @@ def render_report(config: HarnessConfig, batch: str) -> Path:
     lines.append(f"- Cases: {len(summary['cases'])}\n")
 
     lines.append("## Results\n")
-    lines.append("| case_id | status | delivered | overlap_ratio | judge.pass | judge.overall |")
+    lines.append(
+        "| case_id | status | delivered | overlap_ratio | judge.pass | judge.overall |"
+    )
     lines.append("|---|---|---|---|---|---|")
     agreements = 0
     total = 0
@@ -50,7 +52,8 @@ def render_report(config: HarnessConfig, batch: str) -> Path:
         pass_s = "✓" if judge_pass else ("✗" if judge_pass is False else "—")
         lines.append(
             f"| {case['case_id']} | {case['status']} | "
-            f"{case.get('delivered_revision') or '—'} | {overlap_s} | {pass_s} | {overall_s} |"
+            f"{case.get('delivered_revision') or '—'} | {overlap_s} | {pass_s} | "
+            f"{overall_s} |"
         )
         if judge_pass is not None:
             total += 1

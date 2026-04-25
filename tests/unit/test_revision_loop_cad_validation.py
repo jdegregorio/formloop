@@ -219,10 +219,11 @@ async def test_successful_first_source_creates_one_persisted_revision(
     monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_render", _fake_render)
     monkeypatch.setattr("formloop.orchestrator.revision_loop.review_phase", _passing_review)
 
-    delivered = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
+    outcome = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
 
     fresh = store.load_run(runtime.run.run_name)
-    assert delivered == "rev-001"
+    assert outcome.delivered_revision_name == "rev-001"
+    assert outcome.accepted is True
     assert fresh.revisions == ["rev-001"]
     assert ctx.persist_count == 1
     attempt_dir = runtime.run_root / "_work" / "source_attempts" / "attempt-001"
@@ -260,9 +261,10 @@ async def test_build_failure_sends_feedback_and_retries(tmp_path, monkeypatch) -
     monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_render", _fake_render)
     monkeypatch.setattr("formloop.orchestrator.revision_loop.review_phase", _passing_review)
 
-    delivered = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
+    outcome = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
 
-    assert delivered == "rev-001"
+    assert outcome.delivered_revision_name == "rev-001"
+    assert outcome.accepted is True
     assert len(ctx.designer_inputs) == 2
     assert "CAD_VALIDATION_FAILURE_FEEDBACK" in ctx.designer_inputs[1]
     failed = runtime.run_root / "_work" / "source_attempts" / "attempt-001"
@@ -291,9 +293,10 @@ async def test_render_failure_sends_feedback_and_retries(tmp_path, monkeypatch) 
     monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_render", flaky_render)
     monkeypatch.setattr("formloop.orchestrator.revision_loop.review_phase", _passing_review)
 
-    delivered = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
+    outcome = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
 
-    assert delivered == "rev-001"
+    assert outcome.delivered_revision_name == "rev-001"
+    assert outcome.accepted is True
     assert len(ctx.designer_inputs) == 2
     assert '"failed_phase": "render"' in ctx.designer_inputs[1]
     assert calls["render"] == 2
@@ -313,11 +316,93 @@ async def test_exhausted_validation_retries_persist_no_revision(tmp_path, monkey
 
     monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_build", always_fails)
 
-    delivered = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
+    outcome = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
 
     fresh = store.load_run(runtime.run.run_name)
-    assert delivered is None
+    assert outcome.delivered_revision_name is None
+    assert outcome.accepted is False
     assert fresh.revisions == []
     assert ctx.persist_count == 0
     assert len(ctx.designer_inputs) == 4
     assert (runtime.run_root / "_work" / "source_attempts" / "attempt-004").is_dir()
+
+
+async def test_structured_build_error_surfaces_traceback_to_designer(
+    tmp_path, monkeypatch
+) -> None:
+    """cad-cli v0.1.2 structured error JSON should reach the designer verbatim."""
+
+    store, runtime = _runtime(tmp_path)
+    ctx = _FakeContext(store, [_source("bad"), _source("fixed")])
+    calls = {"build": 0}
+
+    designer_traceback = (
+        'Traceback (most recent call last):\n'
+        '  File "model.py", line 4, in build_model\n'
+        '    return Box(width=10)\n'
+        "TypeError: Box.__init__() missing 2 required positional arguments: "
+        "'height' and 'depth'\n"
+    )
+
+    def flaky_build(*args, **kwargs):
+        calls["build"] += 1
+        if calls["build"] == 1:
+            raise CliError(
+                cmd=["cad", "build"],
+                returncode=5,
+                stdout="",
+                stderr="",
+                error_type="GeometryError",
+                error_message=(
+                    "Model callable 'build_model' raised TypeError: "
+                    "Box.__init__() missing 2 required positional arguments"
+                ),
+                traceback_str=designer_traceback,
+                cause={"type": "TypeError", "message": "missing 2 required positional arguments"},
+            )
+        return _fake_build(*args, **kwargs)
+
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_build", flaky_build)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_inspect_summary", _fake_inspect)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_render", _fake_render)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.review_phase", _passing_review)
+
+    outcome = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
+
+    assert outcome.accepted is True
+    assert len(ctx.designer_inputs) == 2
+    feedback_path = (
+        runtime.run_root / "_work" / "source_attempts" / "attempt-001" / "failure-feedback.json"
+    )
+    feedback = json.loads(feedback_path.read_text())
+    assert feedback["failed_phase"] == "build"
+    assert "Traceback (from cad-cli)" in feedback["detail"]
+    assert "TypeError" in feedback["detail"]
+    assert "Box.__init__()" in feedback["detail"]
+    # Designer's repair turn must include the same payload verbatim.
+    assert "Traceback (from cad-cli)" in ctx.designer_inputs[1]
+    assert "Box.__init__()" in ctx.designer_inputs[1]
+
+
+async def test_run_cli_parses_cad_structured_error_payload() -> None:
+    """run_cli should turn cad-cli's stderr error JSON into rich CliError fields."""
+
+    from formloop.runtime.subprocess import _parse_cad_error_payload
+
+    stderr = json.dumps(
+        {
+            "error": {
+                "type": "GeometryError",
+                "message": "Model callable raised TypeError",
+                "traceback": "Traceback (most recent call last):\n  ...\n",
+                "cause": {"type": "TypeError", "message": "bad arg"},
+                "exit_code": 5,
+            }
+        },
+        indent=2,
+    )
+    parsed = _parse_cad_error_payload(stderr)
+    assert parsed is not None
+    assert parsed["type"] == "GeometryError"
+    assert "Traceback" in parsed["traceback"]
+    assert parsed["cause"]["type"] == "TypeError"

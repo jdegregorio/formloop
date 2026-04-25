@@ -48,14 +48,14 @@
 | FLH-NF-006 | The harness shall emit progress information in a polling-friendly format consisting of structured events and materialized snapshots rather than relying on a streaming-only contract. | The v1 UI and tooling model is polling-based. | Implemented |
 | FLH-NF-007 | The harness shall expose enough structured logs, traces, and stored outputs to debug failures in normal runs and eval runs. | Diagnosability is required for development and operator trust. | Implemented |
 | FLH-NF-008 | The harness should keep configuration and context surfaces intentionally small so the system stays maintainable. | The simplification effort is explicitly trying to reduce over-specification and accidental complexity. | Implemented |
-| FLH-NF-009 | The harness shall note and avoid wasteful repeated model or render work when behavior changes would materially increase cost. | Cost discipline is part of the operating model. | Partial — revision loop is bounded by `max_revisions` and short-circuits on pass; smoke uses `dev_test` profile. No per-token metering yet. |
+| FLH-NF-009 | The harness shall note and avoid wasteful repeated model or render work when behavior changes would materially increase cost. | Cost discipline is part of the operating model. | Partial — revision loop is bounded by `max_revisions` and short-circuits on pass. `cad build` failures surface the full cad-cli traceback to the designer (cad-cli v0.1.2+ structured error JSON) so a single subprocess is enough to drive a targeted source repair. Optional `formloop run --post-mortem` surfaces harness optimization issues per run. No per-token metering yet. |
 | FLH-NF-010 | Narration generation shall not block the orchestrator on failure: a Narrator timeout or exception shall degrade to a static fallback message, surface a `narration_error` field on the resulting event, and never abort the run. | Narration is a presentation feature, not a correctness feature; flakiness in the narrator must not cost the user a real CAD output. | Implemented |
 
 ### Design and technical constraint requirements
 
 | ID | Requirement | Rationale | Status |
 | -- | ----------- | --------- | ------ |
-| FLH-D-001 | The harness shall use `cad-cli` as its deterministic CAD tool substrate rather than embedding those responsibilities directly. | Formloop should orchestrate deterministic CAD work, not duplicate it. | Implemented |
+| FLH-D-001 | The harness shall use `cad-cli` as its deterministic CAD tool substrate rather than embedding those responsibilities directly. `cad-cli` shall be a pinned Python dependency of formloop installed into the same venv, and `cad build` shall be invoked with `--python <venv-python>` so model evaluation happens in the formloop interpreter. | Formloop should orchestrate deterministic CAD work, not duplicate it; sharing one Python environment makes test-env and build-env the same env by construction. | Implemented |
 | FLH-D-002 | The harness shall use build123d as the primary modeling backend exposed through Formloop workflows. | This remains a core technical decision. | Implemented |
 | FLH-D-003 | The harness shall treat STEP as the authoritative geometry artifact and GLB as the primary presentation artifact. | This is the agreed artifact split. | Implemented |
 | FLH-D-004 | The harness shall expose a centralized internal runtime abstraction for CLI execution, constrained Python execution, artifact reads, and artifact writes. | The runtime boundary should stay small and explicit. | Implemented |
@@ -74,7 +74,7 @@
 | FLH-D-017 | The harness shall support checked-in named profiles for at least `normal` and `dev_test`. | The configuration surface should stay intentionally small. | Implemented |
 | FLH-D-018 | Developer eval runs shall use the `normal` profile unless a later requirement introduces a dedicated alternative. | A separate `eval` profile is intentionally out of scope for now. | Implemented |
 | FLH-D-019 | The programmatic interface shall be HTTP-only in v1 and shall use asynchronous job semantics with polling. | The UI and tooling model is polling-based HTTP. | Implemented |
-| FLH-D-020 | The runtime abstraction shall capture and parse structured JSON from `cad-cli` stdout for each command it invokes. | `cad-cli` is a structured contract, not an ad hoc text interface. | Implemented |
+| FLH-D-020 | The runtime abstraction shall capture and parse structured JSON from `cad-cli` stdout for each command it invokes, including the structured error payload (`{"error": {"type", "message", "traceback", "cause", "exit_code"}}`) cad-cli emits on stderr under `--format json` when a command fails. The full traceback shall reach the CAD Designer in `CadFailureFeedback.detail`. | `cad-cli` is a structured contract, not an ad hoc text interface; surfacing the real traceback removes the need for a separate pre-build syntax/import gate. | Implemented |
 | FLH-D-021 | The repository shall maintain checked-in schemas for the core persisted state, API, and report contracts needed by v1. | The core machine-readable contracts should be versioned in the repo. | Implemented |
 | FLH-D-022 | The initial schema set shall cover at minimum run, revision, artifact manifest, run snapshot, progress event, review summary, deterministic metrics output, judge output, and the basic create-run request and response contracts. | These are the minimum stable contracts for the simplified v1 surface. | Implemented |
 | FLH-D-023 | The runtime artifact tree shall live under `var/runs/` with one run folder containing run-level state and nested revision folders containing complete persisted revision bundles. | Filesystem conventions need to be stable across CLI, UI, and eval workflows. | Implemented |
@@ -91,7 +91,7 @@
 | FLH-V-004 | Critical user and operator flows shall be maintained in [SPEC.md](SPEC.md). | The simplified spec should hold the essential UAT narrative. | Partial — SPEC.md captures the intent but was not updated in the v1 build-out; refresh to match the landed UAT steps is open. |
 | FLH-V-005 | UAT for critical flows shall include actually using the harness the way an end user or operator would and inspecting whether the delivered part matches the requested outcome. | The user explicitly wants tool-using validation, not documentation-only checklists. | Implemented — `formloop run` for the plate-with-holes UAT produced rev-002 with overlap_ratio=1.000 against ground truth. |
 | FLH-V-006 | Validation shall inspect surfaced outputs, persisted artifacts, review outputs, and visible quirks or failures rather than stopping at successful command completion. | Evidence at the system boundary matters more than internal confidence. | Implemented |
-| FLH-V-007 | The harness shall validate `cad-cli` compatibility and schema-contract conformance as part of preflight and integration coverage. | The system depends on stable structured contracts. | Implemented |
+| FLH-V-007 | The harness shall validate `cad-cli` compatibility and schema-contract conformance as part of preflight and integration coverage, including a `formloop doctor` probe that confirms each designer-advertised library imports successfully under the venv interpreter that `cad build --python` will use. | The system depends on stable structured contracts and on the single-env guarantee — a missing library should fail preflight, not a real run. | Implemented |
 | FLH-V-008 | Eval validation shall confirm per-case artifacts, deterministic metrics, judge outputs, and aggregate reporting outputs. | Eval quality needs concrete proof at both per-case and batch levels. | Partial — runner + report emit all required outputs and the per-case pipeline has been exercised by the UAT; a full batch run against `datasets/basic_shapes` is available via `formloop eval run` but has not been captured as a fixture yet. |
 
 ### Configuration and runtime contract
@@ -100,6 +100,7 @@ The harness configuration baseline is intentionally small:
 
 - The checked-in non-secret configuration file shall live at the repo root as `formloop.harness.toml`.
 - The initial named profiles are `normal` and `dev_test`.
+- The default revision-attempt cap is `max_revisions = 5`.
 - Developer evals should use `normal`.
 - Local development secrets may be loaded from a repo-root `.env.local` file into environment variables at process start, and `.env.local` shall remain untracked.
 - `.gitignore` and `.env.example` are the canonical tracked references for secret posture and should stay aligned with the requirements.

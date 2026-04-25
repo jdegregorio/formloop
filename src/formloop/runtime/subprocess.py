@@ -16,7 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 class CliError(RuntimeError):
-    """Raised when an external CLI exits non-zero or returns malformed JSON."""
+    """Raised when an external CLI exits non-zero or returns malformed JSON.
+
+    When the underlying tool emits a structured error payload (cad-cli v0.1.2+
+    writes ``{"error": {"type", "message", "traceback", "cause", "exit_code"}}``
+    on stderr under ``--format json``), the parsed fields are captured on
+    :attr:`error_type`, :attr:`error_message`, :attr:`traceback_str`, and
+    :attr:`cause`. Callers can use these to surface a real traceback to the
+    designer instead of string-scraping stderr.
+    """
 
     def __init__(
         self,
@@ -26,6 +34,10 @@ class CliError(RuntimeError):
         stdout: str,
         stderr: str,
         message: str | None = None,
+        error_type: str | None = None,
+        error_message: str | None = None,
+        traceback_str: str | None = None,
+        cause: dict[str, str] | None = None,
     ) -> None:
         super().__init__(
             message
@@ -35,6 +47,39 @@ class CliError(RuntimeError):
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
+        self.error_type = error_type
+        self.error_message = error_message
+        self.traceback_str = traceback_str
+        self.cause = cause
+
+
+def _parse_cad_error_payload(stderr: str) -> dict[str, Any] | None:
+    """Best-effort: extract cad-cli's structured ``{"error": {...}}`` payload.
+
+    Returns the inner ``error`` dict if recognized, else ``None``.
+    """
+
+    text = (stderr or "").strip()
+    if not text:
+        return None
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        # cad-cli prints the JSON on a single block; tolerate trailing junk.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        try:
+            payload = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(payload, dict):
+        return None
+    err = payload.get("error")
+    if not isinstance(err, dict):
+        return None
+    return err
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +165,27 @@ def run_cli(
             result.returncode,
             result.stderr[:200],
         )
+        err = _parse_cad_error_payload(result.stderr)
+        if err is not None:
+            cause_raw = err.get("cause")
+            cause: dict[str, str] | None = None
+            if isinstance(cause_raw, dict):
+                cause = {
+                    "type": str(cause_raw.get("type") or ""),
+                    "message": str(cause_raw.get("message") or ""),
+                }
+            raise CliError(
+                cmd=cmd,
+                returncode=result.returncode,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                message=str(err.get("message") or "")
+                or f"{cmd[0]} exited with code {result.returncode}",
+                error_type=str(err.get("type") or "") or None,
+                error_message=str(err.get("message") or "") or None,
+                traceback_str=(str(err["traceback"]) if err.get("traceback") else None),
+                cause=cause,
+            )
         raise CliError(
             cmd=cmd,
             returncode=result.returncode,

@@ -109,7 +109,7 @@ def load_config(path: Path | None = None) -> HarnessConfig:
 
     return HarnessConfig(
         default_profile=default_profile,
-        max_revisions=int(data.get("max_revisions", 3)),
+        max_revisions=int(data.get("max_revisions", 5)),
         runs_dir=(root / str(data.get("runs_dir", "var/runs"))).resolve(),
         evals_dir=(root / str(data.get("evals_dir", "var/evals"))).resolve(),
         timeouts=timeouts,

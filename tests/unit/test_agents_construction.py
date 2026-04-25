@@ -63,8 +63,8 @@ def test_cad_designer_is_source_only(profile: Profile) -> None:
     assert tool_names == set()
     assert CadRevisionResult is not CadSourceResult
     assert "bd_warehouse" in agent.instructions
-    assert "bd_vslot" in agent.instructions
     assert "py_gearworks" in agent.instructions
+    assert "bd_vslot" not in agent.instructions
 
 
 def test_reviewer_and_judge_modes(profile: Profile) -> None:

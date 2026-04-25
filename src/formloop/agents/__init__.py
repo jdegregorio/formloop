@@ -24,6 +24,11 @@ from .narrator import (
     NarrationOutput,
     build_narrator,
 )
+from .postmortem import (
+    PostMortemIssue,
+    RunPostMortem,
+    build_postmortem_agent,
+)
 from .reviewer import build_reviewer
 
 __all__ = [
@@ -35,10 +40,12 @@ __all__ = [
     "ManagerPlan",
     "NarrationInput",
     "NarrationOutput",
+    "PostMortemIssue",
     "PromptContext",
     "ResearchCitation",
     "ResearchFinding",
     "RunContext",
+    "RunPostMortem",
     "Runner",
     "build_cad_designer",
     "build_design_researcher",
@@ -46,5 +53,6 @@ __all__ = [
     "build_manager_plan",
     "build_narrator",
     "build_judge",
+    "build_postmortem_agent",
     "build_reviewer",
 ]

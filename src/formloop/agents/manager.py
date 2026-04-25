@@ -134,14 +134,18 @@ Inputs you receive in the user message:
 - The normalized spec.
 - A summary of each revision attempted and the final review decision.
 - The delivered revision's dimensions and any remaining risks.
+- Whether the latest review accepted the revision, or whether max revisions
+  were exhausted with unresolved review feedback.
 
 Produce a ``ManagerFinalAnswer`` whose ``text`` reads as a clean, user-facing
 summary written in plain prose. Required structure:
 - Opens with a one-sentence direct answer to the user's original request,
-  written naturally — confirm what was delivered, not how the harness
-  bookkeeps it.
+  written naturally — confirm what was delivered only when review accepted it.
+  If max revisions were exhausted or latest review is revise, say the latest
+  candidate is not accepted yet and summarize the remaining blocker.
 - Lists the delivered dimensions in a compact way.
 - Calls out any known risks or remaining uncertainties plainly.
+- If the run did not pass review, avoid saying it is complete/successful.
 - May briefly mention how many revision attempts were made if it adds
   meaningful context (e.g. "after one pass" or "after two iterations").
 

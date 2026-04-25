@@ -36,6 +36,7 @@ from .narration import sanitize_context
 from .narrator import Narrator
 from .phase_context import PhaseRuntimeContext
 from .planning import plan_phase
+from .postmortem import run_postmortem
 from .research import research_phase
 from .revision_loop import revision_loop_phase
 
@@ -50,6 +51,7 @@ class DriveRequest:
     reasoning_override: str | None = None
     reference_image: str | None = None
     max_revisions: int | None = None
+    post_mortem: bool = False
 
 
 class RunDriver:
@@ -105,12 +107,23 @@ class RunDriver:
             profile=profile,
             max_revisions=max_revisions,
             user_prompt=request.prompt,
+            post_mortem=request.post_mortem,
         )
 
     async def continue_run(
-        self, *, run, run_ctx: RunContext, profile: Profile, max_revisions: int, user_prompt: str
+        self,
+        *,
+        run,
+        run_ctx: RunContext,
+        profile: Profile,
+        max_revisions: int,
+        user_prompt: str,
+        post_mortem: bool = False,
     ) -> dict[str, Any]:
         delivered_rev_name: str | None = None
+        accepted = False
+        exhausted_revisions = False
+        latest_review_decision: str | None = None
         runtime = PhaseRuntimeContext(
             run=run, run_ctx=run_ctx, profile=profile, user_prompt=user_prompt
         )
@@ -129,20 +142,44 @@ class RunDriver:
             try:
                 plan = await plan_phase(self, runtime)
                 findings = await research_phase(self, runtime, plan=plan)
-                delivered_rev_name = await revision_loop_phase(
+                revision_outcome = await revision_loop_phase(
                     self,
                     runtime,
                     plan=plan,
                     findings=findings,
                     max_revisions=max_revisions,
                 )
-                final = await self._finalize(run, plan, delivered_rev_name, profile)
+                delivered_rev_name = revision_outcome.delivered_revision_name
+                accepted = revision_outcome.accepted
+                exhausted_revisions = revision_outcome.exhausted_revisions
+                latest_review_decision = revision_outcome.latest_review_decision
+                final = await self._finalize(
+                    run,
+                    plan,
+                    delivered_rev_name,
+                    profile,
+                    accepted=accepted,
+                    exhausted_revisions=exhausted_revisions,
+                    latest_review_decision=latest_review_decision,
+                    max_revisions=max_revisions,
+                )
                 run = self.store.load_run(run.run_name)
                 run.final_answer = AgentAnswer(
                     text=final.text, delivered_revision_name=delivered_rev_name
                 )
-                run.status = RunStatus.succeeded if delivered_rev_name else RunStatus.failed
-                if not delivered_rev_name:
+                run.status = (
+                    RunStatus.succeeded if delivered_rev_name and accepted else RunStatus.failed
+                )
+                if exhausted_revisions:
+                    run.status_detail = (
+                        f"max revisions exhausted ({max_revisions}); "
+                        f"latest review decision={latest_review_decision}"
+                    )
+                elif delivered_rev_name and not accepted:
+                    run.status_detail = (
+                        f"latest review decision={latest_review_decision or 'unknown'}"
+                    )
+                elif not delivered_rev_name:
                     run.status_detail = "no revision bundle was delivered"
                 self.store.save_run(run)
                 self.emit(
@@ -175,6 +212,8 @@ class RunDriver:
                 raise
         finally:
             teardown_run_logger(log_handler)
+            if post_mortem:
+                await self._run_postmortem(run.run_name, profile)
 
         return {
             "run_name": run.run_name,
@@ -184,8 +223,40 @@ class RunDriver:
             "final_answer": run.final_answer.text if run.final_answer else None,
         }
 
+    async def _run_postmortem(self, run_name: str, profile: Profile) -> None:
+        """Best-effort post-mortem after the run completes.
+
+        Failures are logged and recorded in the run dir but never propagate —
+        the post-mortem is an observability aid, not a correctness gate.
+        """
+
+        run_dir = self.store.layout(run_name).root
+        try:
+            await run_postmortem(
+                runs_dir=self.config.runs_dir,
+                run_name=run_name,
+                output_dir=run_dir,
+                profile=profile,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("post-mortem failed: name=%s", run_name)
+            error = f"{type(exc).__name__}: {exc}"[:500]
+            try:
+                (run_dir / "run-postmortem-error.txt").write_text(error)
+            except OSError:
+                pass
+
     async def _finalize(
-        self, run, plan, delivered_rev_name: str | None, profile: Profile
+        self,
+        run,
+        plan,
+        delivered_rev_name: str | None,
+        profile: Profile,
+        *,
+        accepted: bool,
+        exhausted_revisions: bool,
+        latest_review_decision: str | None,
+        max_revisions: int,
     ) -> ManagerFinalAnswer:
         fresh = self.store.load_run(run.run_name)
         snap = self.store.load_snapshot(run.run_name)
@@ -196,6 +267,10 @@ class RunDriver:
             "latest_review_decision": (
                 snap.latest_review_decision.value if snap.latest_review_decision else None
             ),
+            "accepted": accepted,
+            "exhausted_revisions": exhausted_revisions,
+            "latest_review_decision_from_loop": latest_review_decision,
+            "max_revisions": max_revisions,
             "assumptions": [a.model_dump() for a in fresh.assumptions],
         }
         return await self.finalize(payload, profile)
@@ -362,6 +437,7 @@ async def drive_run(
     effort: str | None = None,
     reference_image: str | None = None,
     max_revisions: int | None = None,
+    post_mortem: bool = False,
     event_hook: Callable[[ProgressEvent], None] | None = None,
     narrator: Narrator | None = None,
 ) -> dict[str, Any]:
@@ -374,5 +450,6 @@ async def drive_run(
             reasoning_override=effort,
             reference_image=reference_image,
             max_revisions=max_revisions,
+            post_mortem=post_mortem,
         )
     )

@@ -18,7 +18,6 @@ dependencies = [
   "httpx>=0.27.0,<1.0.0",
   "cad-cli",
   "bd_warehouse @ git+https://github.com/gumyr/bd_warehouse.git",
-  "bd-vslot>=0.0.2,<0.1.0",
   "py_gearworks @ git+https://github.com/GarryBGoode/py_gearworks.git",
 ]
 
@@ -44,7 +43,10 @@ packages = ["src/formloop"]
 allow-direct-references = true
 
 [tool.uv.sources]
-cad-cli = { path = "../cad-cli", editable = true }
+# Default fresh-install source: pinned cad-cli release.
+# For local cad-cli development, override in a personal `.uv.toml` (or run
+# `uv pip install -e ../cad-cli`) so this file stays portable for fresh clones.
+cad-cli = { git = "https://github.com/jdegregorio/cad-cli.git", tag = "v0.1.2" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -61,6 +63,11 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# The Build123D cheat sheet is a wide markdown table embedded as a string
+# literal; wrapping would corrupt rendering. Allow long lines in this module.
+"src/formloop/agents/cad_designer.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

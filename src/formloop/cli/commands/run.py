@@ -40,6 +40,16 @@ def register(app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -> N
             int | None,
             typer.Option("--max-revisions", help="Override max revision attempts."),
         ] = None,
+        post_mortem: Annotated[
+            bool,
+            typer.Option(
+                "--post-mortem/--no-post-mortem",
+                help=(
+                    "After the run completes, ask an LLM to draft harness "
+                    "optimization issues from this run's logs/events/errors."
+                ),
+            ),
+        ] = False,
         quiet: Annotated[
             bool,
             typer.Option(
@@ -94,6 +104,7 @@ def register(app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -> N
                     effort=effort,
                     reference_image=ref,
                     max_revisions=max_revisions,
+                    post_mortem=post_mortem,
                     event_hook=renderer,
                 )
             )

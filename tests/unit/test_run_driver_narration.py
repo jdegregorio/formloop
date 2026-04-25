@@ -36,6 +36,7 @@ from formloop.config.profiles import (
     Timeouts,
 )
 from formloop.orchestrator.narrator import Narrator
+from formloop.orchestrator.revision_loop import RevisionLoopResult
 from formloop.orchestrator.run_driver import DriveRequest, RunDriver
 from formloop.runtime.subprocess import CliError
 from formloop.schemas import ProgressEventKind
@@ -251,7 +252,11 @@ async def test_run_driver_coordinates_phase_functions(tmp_path, monkeypatch) -> 
     async def fake_revision(ctx, runtime, *, plan, findings, max_revisions):
         assert ctx is driver
         calls.append("revision")
-        return None
+        return RevisionLoopResult(
+            delivered_revision_name=None,
+            accepted=False,
+            exhausted_revisions=False,
+        )
 
     monkeypatch.setattr("formloop.orchestrator.run_driver.plan_phase", fake_plan)
     monkeypatch.setattr("formloop.orchestrator.run_driver.research_phase", fake_research)
@@ -260,3 +265,58 @@ async def test_run_driver_coordinates_phase_functions(tmp_path, monkeypatch) -> 
     result = await driver.run(DriveRequest(prompt="a 20mm cube"))
     assert calls == ["plan", "research", "revision"]
     assert result["status"] == "failed"
+
+
+async def test_run_status_failed_when_max_revisions_exhausted(tmp_path, monkeypatch) -> None:
+    config = _stub_config(tmp_path)
+    driver = RunDriver(config, narrator=Narrator(fallback_only=True))
+
+    async def fake_plan(ctx, runtime):
+        return ManagerPlan(
+            normalized_spec=NormalizedSpec(
+                name="cube",
+                type="component",
+                units="mm",
+                design_intent="Simple calibration cube.",
+                features=["Solid cube body"],
+                interfaces=[],
+                constraints=["edge length must be 20 mm"],
+                preferences=[],
+                manufacturing_method=None,
+                key_dimension_parameters={"size_mm": 20},
+            ),
+            assumptions=[],
+            research_topics=[],
+            design_brief="brief",
+        )
+
+    async def fake_research(ctx, runtime, *, plan):
+        return []
+
+    async def fake_revision(ctx, runtime, *, plan, findings, max_revisions):
+        return RevisionLoopResult(
+            delivered_revision_name="rev-003",
+            accepted=False,
+            exhausted_revisions=True,
+            latest_review_decision="revise",
+        )
+
+    async def fake_finalize(payload, profile):
+        assert payload["accepted"] is False
+        assert payload["exhausted_revisions"] is True
+        return ManagerFinalAnswer(
+            text="The latest candidate still needs revision.",
+            delivered_revision_name="rev-003",
+        )
+
+    monkeypatch.setattr("formloop.orchestrator.run_driver.plan_phase", fake_plan)
+    monkeypatch.setattr("formloop.orchestrator.run_driver.research_phase", fake_research)
+    monkeypatch.setattr("formloop.orchestrator.run_driver.revision_loop_phase", fake_revision)
+    monkeypatch.setattr(driver, "finalize", fake_finalize)
+
+    result = await driver.run(DriveRequest(prompt="a 20mm cube"))
+    run = driver.store.load_run(result["run_name"])
+
+    assert result["status"] == "failed"
+    assert result["delivered_revision"] == "rev-003"
+    assert run.status_detail == "max revisions exhausted (1); latest review decision=revise"

@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -109,8 +110,17 @@ class CadCompareResult(_CadResult):
 
 
 def locate_cad() -> str:
-    """Resolve the ``cad`` executable path. Raises CliError if missing."""
+    """Resolve the ``cad`` executable path. Raises CliError if missing.
 
+    Prefers the formloop venv's own ``cad`` script (installed by ``uv sync``
+    via the cad-cli pip dependency) over any global ``uv tool install`` shim,
+    so the model loaded by ``cad build --python ...`` and the rest of formloop
+    share one Python environment.
+    """
+
+    venv_local = Path(sys.executable).parent / "cad"
+    if venv_local.is_file():
+        return str(venv_local)
     path = shutil.which("cad")
     if not path:
         raise CliError(
@@ -118,8 +128,10 @@ def locate_cad() -> str:
             returncode=127,
             stdout="",
             stderr="",
-            message="`cad` CLI not found on PATH. Install cad-cli: "
-            "`uv tool install <path-to-cad-cli>` or add it to PATH.",
+            message=(
+                "`cad` CLI not found. Run `uv sync` to install cad-cli into the "
+                "formloop venv, or ensure a `cad` binary is on PATH."
+            ),
         )
     return path
 
@@ -165,8 +177,15 @@ def cad_build(
     output_dir: Path,
     overrides: dict[str, Any] | None = None,
     timeout: float | None = None,
+    python_path: str | os.PathLike[str] | None = None,
 ) -> CadBuildResult:
-    """Invoke ``cad build`` and return the parsed result."""
+    """Invoke ``cad build`` and return the parsed result.
+
+    ``python_path`` is forwarded to ``cad build --python``; defaults to
+    ``sys.executable`` so the model is evaluated in the formloop venv. Pass
+    ``False``/``""`` explicitly via ``python_path=""`` to use cad-cli's own
+    interpreter (the legacy embedded path).
+    """
 
     cmd: list[str] = [
         locate_cad(),
@@ -177,6 +196,10 @@ def cad_build(
         "--format",
         "json",
     ]
+    if python_path is None:
+        python_path = sys.executable
+    if python_path:
+        cmd += ["--python", str(python_path)]
     cmd += _format_overrides(overrides)
     result = run_cli(cmd, timeout=timeout)
     payload = result.parse_json()

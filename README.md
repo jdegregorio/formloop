@@ -23,6 +23,20 @@ mirror the in-place reasoning-trace pattern without scanning the event tail.
 
 ## Quick start
 
+### System prerequisites
+
+- Python 3.12+
+- [`uv`](https://docs.astral.sh/uv/) for dependency management
+- **Blender** — required for `cad render` and `cad compare --render-diffs`. Install it once for your platform:
+
+  ```bash
+  brew install --cask blender             # macOS
+  # Linux: install via your package manager or download from https://www.blender.org/
+  # Windows: install from https://www.blender.org/ and ensure `blender` is on PATH
+  ```
+
+### Install
+
 ```bash
 # inside the formloop/ directory
 uv sync --extra dev
@@ -32,7 +46,25 @@ uv run formloop doctor
 uv run formloop run "a 20mm cube" --profile dev_test
 ```
 
-Run artifacts land under `var/runs/run-NNNN/`.
+`uv sync` installs `cad-cli` (pinned to a tagged release in `pyproject.toml`)
+and the build123d ecosystem libraries directly into formloop's `.venv`.
+There is no separate `uv tool install cad-cli` step — formloop and cad-cli
+share one Python environment so the model evaluated by `cad build --python`
+sees the same packages the rest of the harness uses. Run artifacts land under
+`var/runs/run-NNNN/`.
+
+### Hacking on cad-cli alongside formloop
+
+When iterating on cad-cli locally, override the pinned source with a personal
+`.uv.toml` (uncommitted) at the repo root:
+
+```toml
+[sources]
+cad-cli = { path = "../cad-cli", editable = true }
+```
+
+…or run `uv pip install -e ../cad-cli` after `uv sync`. `pyproject.toml` keeps
+the git tag pin so fresh clones do not need a sibling cad-cli checkout.
 
 ## Build123D part-library support in CAD generation
 
@@ -41,8 +73,13 @@ Build123D-native approaches plus these installed helper libraries when
 appropriate:
 
 - `bd_warehouse`
-- `bd_vslot`
 - `py_gearworks`
+
+These libraries live in formloop's own venv and are visible to `cad build`
+because every build is invoked with `--python <formloop-venv-python>` (cad-cli
+v0.1.2+). Adding or removing a designer-advertised library is therefore a
+formloop-side dependency change; `formloop doctor` verifies each advertised
+library is importable in the venv that `cad build` will use.
 
 `bd_beams_and_bars` is not bundled in the default Python 3.12 environment
 because its upstream package currently requires Python 3.13.

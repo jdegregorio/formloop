@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +78,14 @@ class CadValidationResult(BaseModel):
     build_result: dict[str, Any] | None = None
     inspect_result: dict[str, Any] | None = None
     render_result: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RevisionLoopResult:
+    delivered_revision_name: str | None
+    accepted: bool
+    exhausted_revisions: bool
+    latest_review_decision: str | None = None
 
 
 def _staging_views_dir(run_root: Path, attempt: int) -> Path:
@@ -174,30 +183,49 @@ def _command_failure(
     stdout = ""
     stderr = ""
     cmd_label = command
+    error_type: str = type(exc).__name__
+    structured_message: str | None = None
+    traceback_str: str | None = None
+    cause: dict[str, str] | None = None
     if isinstance(exc, CliError):
         returncode = exc.returncode
         stdout = exc.stdout
         stderr = exc.stderr
         cmd_label = " ".join(exc.cmd) if exc.cmd else command
-    detail = str(exc)
+        if exc.error_type:
+            error_type = exc.error_type
+        structured_message = exc.error_message
+        traceback_str = exc.traceback_str
+        cause = exc.cause
+    plain_detail = str(exc)
+    summary_text = (structured_message or plain_detail).strip() or f"{phase} failed"
+    if traceback_str:
+        detail_text = (
+            f"{error_type}: {summary_text}\n\nTraceback (from cad-cli):\n{traceback_str}"
+        )
+        if cause and (cause.get("type") or cause.get("message")):
+            cause_line = f"\nCause: {cause.get('type', '')}: {cause.get('message', '')}".rstrip()
+            detail_text += cause_line
+    else:
+        detail_text = plain_detail
     evidence = CadCommandEvidence(
         command=cmd_label,
         status="failed",
         duration_s=round(elapsed_s, 3),
         timeout_s=timeout_s,
         returncode=returncode,
-        summary=detail[:500],
+        summary=summary_text[:500],
         stdout_snippet=_clip(stdout),
         stderr_snippet=_clip(stderr),
-        error_type=type(exc).__name__,
+        error_type=error_type,
     )
     feedback = CadFailureFeedback(
         revision_attempt=revision_attempt,
         source_attempt=source_attempt,
         failed_phase=phase,
         failed_command=cmd_label,
-        summary=f"{phase} failed: {detail[:500]}",
-        detail=detail[:2000],
+        summary=f"{phase} failed: {summary_text[:500]}",
+        detail=_clip(detail_text),
         returncode=returncode,
         stdout_snippet=_clip(stdout),
         stderr_snippet=_clip(stderr),
@@ -207,7 +235,7 @@ def _command_failure(
         repair_instructions=[
             "Return a corrected complete model.py source in CadSourceResult.source.",
             "Do not call cad-cli yourself; the harness will rerun validation.",
-            "Use the failed command stderr/stdout to make the smallest source fix.",
+            "Read the traceback in `detail` to identify the exact failing line.",
         ],
     )
     return evidence, feedback
@@ -605,10 +633,12 @@ async def revision_loop_phase(
     plan,
     findings: list[dict],
     max_revisions: int,
-) -> str | None:
+) -> RevisionLoopResult:
     run = runtime.run
     prior_review: dict | None = None
     delivered: str | None = None
+    accepted = False
+    latest_review_decision: str | None = None
 
     for attempt in range(1, max_revisions + 1):
         logger.info("revision attempt: %d/%d", attempt, max_revisions)
@@ -759,9 +789,19 @@ async def revision_loop_phase(
             cad_out=cad_out,
             revision=revision,
         )
+        latest_review_decision = review.decision.value
         if review.decision == ReviewDecision.pass_:
             ctx.emit(run.run_name, ProgressEventKind.breadcrumb, message="revision accepted")
+            accepted = True
             break
         prior_review = review.model_dump()
 
-    return delivered
+    exhausted = bool(
+        delivered and not accepted and latest_review_decision == ReviewDecision.revise.value
+    )
+    return RevisionLoopResult(
+        delivered_revision_name=delivered,
+        accepted=accepted,
+        exhausted_revisions=exhausted,
+        latest_review_decision=latest_review_decision,
+    )
