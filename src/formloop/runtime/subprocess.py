@@ -35,6 +35,22 @@ class CliError(RuntimeError):
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
+        self.cli_error_type: str | None = None
+        self.cli_error_message: str | None = None
+        self.cli_error_traceback: str | None = None
+
+        for output in (self.stderr, self.stdout):
+            if output and output.strip().startswith("{"):
+                try:
+                    payload = json.loads(output)
+                    if isinstance(payload, dict) and "error" in payload and isinstance(payload["error"], dict):
+                        err = payload["error"]
+                        self.cli_error_type = err.get("type")
+                        self.cli_error_message = err.get("message")
+                        self.cli_error_traceback = err.get("traceback")
+                        break
+                except json.JSONDecodeError:
+                    continue
 
 
 @dataclass(frozen=True, slots=True)

@@ -43,3 +43,24 @@ def test_missing_executable_becomes_cli_error() -> None:
 def test_does_not_raise_when_check_false() -> None:
     r = run_cli([sys.executable, "-c", "import sys; sys.exit(3)"], check=False)
     assert r.returncode == 3
+
+
+def test_cli_error_parses_structured_error_json() -> None:
+    import json
+    json_stderr = json.dumps({
+        "error": {
+            "type": "ValueError",
+            "message": "bad value",
+            "traceback": "Traceback (most recent call last):\\n  File 'foo.py', line 1",
+            "exit_code": 1
+        }
+    })
+    err = CliError(
+        cmd=["cad", "build"],
+        returncode=1,
+        stdout="",
+        stderr=json_stderr,
+    )
+    assert err.cli_error_type == "ValueError"
+    assert err.cli_error_message == "bad value"
+    assert "Traceback" in err.cli_error_traceback

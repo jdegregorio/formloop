@@ -279,6 +279,43 @@ async def test_build_failure_sends_feedback_and_retries(tmp_path, monkeypatch) -
     assert any(ev.kind is ProgressEventKind.cad_validation_failed for ev in ctx.events)
 
 
+async def test_build_failure_with_traceback_sends_to_feedback(tmp_path, monkeypatch) -> None:
+    store, runtime = _runtime(tmp_path)
+    ctx = _FakeContext(store, [_source("bad"), _source("fixed")])
+    calls = {"build": 0}
+
+    def flaky_build(*args, **kwargs):
+        calls["build"] += 1
+        if calls["build"] == 1:
+            json_stderr = json.dumps({
+                "error": {
+                    "type": "BuildError",
+                    "message": "msg",
+                    "traceback": "Traceback (most recent call last): ...",
+                    "exit_code": 1
+                }
+            })
+            raise CliError(
+                cmd=["cad", "build"],
+                returncode=1,
+                stdout="",
+                stderr=json_stderr,
+            )
+        return _fake_build(*args, **kwargs)
+
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_build", flaky_build)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_inspect_summary", _fake_inspect)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_render", _fake_render)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.review_phase", _passing_review)
+
+    delivered = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
+
+    assert delivered == "rev-001"
+    assert len(ctx.designer_inputs) == 2
+    assert "Traceback (from cad-cli):" in ctx.designer_inputs[1]
+    assert "Traceback (most recent call last): ..." in ctx.designer_inputs[1]
+
+
 async def test_render_failure_sends_feedback_and_retries(tmp_path, monkeypatch) -> None:
     store, runtime = _runtime(tmp_path)
     ctx = _FakeContext(store, [_source("render bad"), _source("render fixed")])

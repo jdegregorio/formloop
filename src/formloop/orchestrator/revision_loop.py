@@ -174,12 +174,14 @@ def _command_failure(
     stdout = ""
     stderr = ""
     cmd_label = command
+    detail = str(exc)
     if isinstance(exc, CliError):
         returncode = exc.returncode
         stdout = exc.stdout
         stderr = exc.stderr
         cmd_label = " ".join(exc.cmd) if exc.cmd else command
-    detail = str(exc)
+        if exc.cli_error_traceback:
+            detail = f"{detail}\n\nTraceback (from cad-cli):\n{exc.cli_error_traceback}"
     evidence = CadCommandEvidence(
         command=cmd_label,
         status="failed",
