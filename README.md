@@ -36,16 +36,15 @@ Run artifacts land under `var/runs/run-NNNN/`.
 
 ## Build123D part-library support in CAD generation
 
-The CAD Designer instructions and research workflow are wired to prefer
-Build123D-native approaches plus these installed helper libraries when
-appropriate:
+The CAD Designer agent carries a comprehensive cheat sheet covering
+Build123D core primitives, operations, and these installed extension libraries:
 
-- `bd_warehouse`
-- `bd_vslot`
-- `py_gearworks`
+- `bd_warehouse` — parametric fasteners, bearings, threads, flanges, pipes, sprockets, gears
+- `py_gearworks` — accurate involute/cycloid/bevel gear generation
 
-`bd_beams_and_bars` is not bundled in the default Python 3.12 environment
-because its upstream package currently requires Python 3.13.
+The cheat sheet includes required-vs-optional argument signatures for every
+advertised constructor, so the designer can author correct imports and
+constructors without external lookups.
 
 During planning/research, manager-generated research topics may include both
 engineering/standards questions and Build123D implementation-method questions
