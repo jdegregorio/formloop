@@ -24,13 +24,18 @@ mirror the in-place reasoning-trace pattern without scanning the event tail.
 ## Quick start
 
 ```bash
-# inside the formloop/ directory
+# inside the formloop/ directory — single step installs everything
 uv sync --extra dev
 cp .env.example .env.local     # add OPENAI_API_KEY
 
 uv run formloop doctor
 uv run formloop run "a 20mm cube" --profile dev_test
 ```
+
+`uv sync` installs `cad-cli`, `build123d`, and all CAD helper libraries into
+one shared virtualenv. No separate `uv tool install` step is needed — `cad
+build` invokes models with `--python <venv>/bin/python3` so that `bd_warehouse`
+and `py_gearworks` are always visible.
 
 Run artifacts land under `var/runs/run-NNNN/`.
 
@@ -41,7 +46,6 @@ Build123D-native approaches plus these installed helper libraries when
 appropriate:
 
 - `bd_warehouse`
-- `bd_vslot`
 - `py_gearworks`
 
 `bd_beams_and_bars` is not bundled in the default Python 3.12 environment

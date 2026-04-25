@@ -16,7 +16,7 @@ dependencies = [
   "typer>=0.12.0,<1.0.0",
   "python-dotenv>=1.0.0,<2.0.0",
   "httpx>=0.27.0,<1.0.0",
-  "cad-cli",
+  "cad-cli>=0.1.2",
   "bd_warehouse @ git+https://github.com/gumyr/bd_warehouse.git",
   "bd-vslot>=0.0.2,<0.1.0",
   "py_gearworks @ git+https://github.com/GarryBGoode/py_gearworks.git",
@@ -44,7 +44,7 @@ packages = ["src/formloop"]
 allow-direct-references = true
 
 [tool.uv.sources]
-cad-cli = { path = "../cad-cli", editable = true }
+cad-cli = { git = "https://github.com/jdegregorio/cad-cli.git", tag = "v0.1.2" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
