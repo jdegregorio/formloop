@@ -61,19 +61,6 @@ wheels = [
 ]
 
 [[package]]
-name = "bd-vslot"
-version = "0.0.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "build123d" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f1/76/5186eca214bb6c47b9f54f607f797cb4361690b3e2e439bc9c68a954cdc0/bd_vslot-0.0.2.tar.gz", hash = "sha256:8966ec5f118e67ab05cfd8da2d870231cc47d6371df9415f38da1194db6b197f", size = 7826, upload-time = "2026-01-03T03:50:56.248Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/4c/b90c552ff4922f8a7504c59a57966cb55f86a547f3fb611ba0c220a51b97/bd_vslot-0.0.2-py3-none-any.whl", hash = "sha256:0a6697e662cbaac919e08de4e2ec5e02feae74544b2577b0e0f348d381c00ac8", size = 9406, upload-time = "2026-01-03T03:50:55.22Z" },
-]
-
-[[package]]
 name = "bd-warehouse"
 version = "0.2.0"
 source = { git = "https://github.com/gumyr/bd_warehouse.git#13bd8260ec42444eaa852b2697ba373af9227cc5" }
@@ -553,7 +540,6 @@ name = "formloop"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "bd-vslot" },
     { name = "bd-warehouse" },
     { name = "cad-cli" },
     { name = "fastapi" },
@@ -576,7 +562,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "bd-vslot", specifier = ">=0.0.2,<0.1.0" },
     { name = "bd-warehouse", git = "https://github.com/gumyr/bd_warehouse.git" },
     { name = "cad-cli", git = "https://github.com/jdegregorio/cad-cli.git?tag=v0.1.2" },
     { name = "fastapi", specifier = ">=0.115.0,<0.200.0" },
