@@ -209,6 +209,15 @@ async def _passing_review(*args, **kwargs) -> ReviewSummary:
     )
 
 
+async def _revising_review(*args, **kwargs) -> ReviewSummary:
+    return ReviewSummary(
+        decision=ReviewDecision.revise,
+        confidence=0.4,
+        key_findings=["dimensions off"],
+        revision_instructions="tighten the fit",
+    )
+
+
 async def test_successful_first_source_creates_one_persisted_revision(
     tmp_path, monkeypatch
 ) -> None:
@@ -297,6 +306,31 @@ async def test_render_failure_sends_feedback_and_retries(tmp_path, monkeypatch) 
     assert len(ctx.designer_inputs) == 2
     assert '"failed_phase": "render"' in ctx.designer_inputs[1]
     assert calls["render"] == 2
+
+
+async def test_persisted_revisions_without_review_pass_are_not_delivered(
+    tmp_path, monkeypatch
+) -> None:
+    """Regression: a revision is "delivered" only when review accepts it.
+
+    Previously the loop set ``delivered`` immediately after persistence, so
+    exhausting ``max_revisions`` with revise-decisions still returned the
+    last revision name and the run was reported as succeeded.
+    """
+
+    store, runtime = _runtime(tmp_path)
+    ctx = _FakeContext(store, [_source("first"), _source("second")])
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_build", _fake_build)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_inspect_summary", _fake_inspect)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_render", _fake_render)
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.review_phase", _revising_review)
+
+    delivered = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=2)
+
+    fresh = store.load_run(runtime.run.run_name)
+    assert delivered is None
+    assert fresh.revisions == ["rev-001", "rev-002"]
+    assert ctx.persist_count == 2
 
 
 async def test_exhausted_validation_retries_persist_no_revision(tmp_path, monkeypatch) -> None:
