@@ -46,6 +46,7 @@ class Timeouts:
 class HarnessConfig:
     default_profile: str
     max_revisions: int
+    designer_max_turns: int
     runs_dir: Path
     evals_dir: Path
     timeouts: Timeouts
@@ -110,6 +111,7 @@ def load_config(path: Path | None = None) -> HarnessConfig:
     return HarnessConfig(
         default_profile=default_profile,
         max_revisions=int(data.get("max_revisions", 5)),
+        designer_max_turns=int(data.get("designer_max_turns", 25)),
         runs_dir=(root / str(data.get("runs_dir", "var/runs"))).resolve(),
         evals_dir=(root / str(data.get("evals_dir", "var/evals"))).resolve(),
         timeouts=timeouts,

@@ -6,6 +6,7 @@ default_profile = "normal"
 
 # Revision loop discipline (FLH-NF-009).
 max_revisions = 3
+designer_max_turns = 25
 
 # Path (relative to repo root) where generated run artifacts live (FLH-D-023).
 runs_dir = "var/runs"
