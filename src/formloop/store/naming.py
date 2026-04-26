@@ -1,4 +1,4 @@
-"""Human-readable sequential naming for runs and revisions.
+"""Human-readable sequential naming and atomic reservation for runs/revisions.
 
 REQ: FLH-F-023
 """
@@ -37,3 +37,39 @@ def next_revision_name(revisions_dir: Path) -> str:
 
     idx = _max_index(revisions_dir, REVISION_PATTERN) + 1
     return f"rev-{idx:03d}"
+
+
+def reserve_next_run_name_dir(runs_root: Path) -> str:
+    """Atomically reserve and create the next available run directory."""
+
+    return _reserve_next_name_dir(
+        parent=runs_root,
+        pattern=RUN_PATTERN,
+        prefix="run",
+        min_width=4,
+    )
+
+
+def reserve_next_revision_name_dir(revisions_dir: Path) -> str:
+    """Atomically reserve and create the next available revision directory."""
+
+    return _reserve_next_name_dir(
+        parent=revisions_dir,
+        pattern=REVISION_PATTERN,
+        prefix="rev",
+        min_width=3,
+    )
+
+
+def _reserve_next_name_dir(
+    *, parent: Path, pattern: re.Pattern[str], prefix: str, min_width: int
+) -> str:
+    parent.mkdir(parents=True, exist_ok=True)
+    idx = _max_index(parent, pattern) + 1
+    while True:
+        name = f"{prefix}-{idx:0{min_width}d}"
+        try:
+            (parent / name).mkdir(parents=False, exist_ok=False)
+            return name
+        except FileExistsError:
+            idx += 1

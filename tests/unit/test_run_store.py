@@ -6,6 +6,7 @@ REQ: FLH-F-009, FLH-F-011, FLH-F-021, FLH-F-022, FLH-F-024
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -275,3 +276,30 @@ def test_atomic_write_leaves_no_tmp_file(
     _, layout = store.create_run(input_summary="x", effective_runtime=effective_runtime)
     leftovers = list(layout.root.rglob("*.tmp"))
     assert leftovers == []
+
+
+def test_create_run_is_atomic_under_concurrency(
+    store: RunStore, effective_runtime: EffectiveRuntime
+) -> None:
+    def _create(idx: int) -> tuple[str, Path]:
+        run, layout = store.create_run(
+            input_summary=f"request-{idx}",
+            effective_runtime=effective_runtime,
+        )
+        return run.run_name, layout.root
+
+    total = 24
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        created = list(executor.map(_create, range(total)))
+
+    run_names = [name for name, _ in created]
+    assert len(run_names) == total
+    assert len(set(run_names)) == total
+
+    for name, root in created:
+        assert root.name == name
+        assert (root / "run.json").is_file()
+        assert (root / "events.jsonl").is_file()
+        events = store.read_events(name)
+        assert len(events) == 1
+        assert events[0].message == f"run {name} created"
