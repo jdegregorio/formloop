@@ -169,6 +169,15 @@
       "default": null,
       "title": "Reference Image"
     },
+    "research_findings": {
+      "description": "Raw outputs from the background research topics.",
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Research Findings",
+      "type": "array"
+    },
     "revisions": {
       "description": "Ordered list of revision names (rev-001, ...).",
       "items": {

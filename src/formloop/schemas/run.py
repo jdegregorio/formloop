@@ -61,6 +61,9 @@ class Run(SchemaModel):
 
     current_spec: dict[str, Any] = Field(default_factory=dict)
     assumptions: list[AssumptionRecord] = Field(default_factory=list)
+    research_findings: list[dict[str, Any]] = Field(
+        default_factory=list, description="Raw outputs from the background research topics."
+    )
 
     revisions: list[str] = Field(
         default_factory=list, description="Ordered list of revision names (rev-001, ...)."
