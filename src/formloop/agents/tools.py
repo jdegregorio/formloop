@@ -1,8 +1,11 @@
 import importlib
 import inspect
+import logging
 import pydoc
 import traceback
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from agents import apply_diff, function_tool, RunContextWrapper
 
@@ -21,27 +24,34 @@ class WorkspaceEditor:
         return path
 
     async def create_file(self, operation):
+        logger.info("WorkspaceEditor.create_file: %s", operation.path)
         path = self._path(operation.path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        content = apply_diff("", operation.diff, create=True)
+        content = apply_diff("", operation.diff)
         path.write_text(content)
         return {"status": "completed", "output": f"Created {operation.path}"}
 
     async def update_file(self, operation):
+        logger.info("WorkspaceEditor.update_file: %s", operation.path)
         path = self._path(operation.path)
-        current = path.read_text()
+        try:
+            current = path.read_text()
+        except FileNotFoundError:
+            return {"status": "failed", "error": f"File {operation.path} does not exist. Use create_file instead."}
         new_content = apply_diff(current, operation.diff)
         path.write_text(new_content)
         return {"status": "completed", "output": f"Updated {operation.path}"}
 
     async def delete_file(self, operation):
+        logger.info("WorkspaceEditor.delete_file: %s", operation.path)
         path = self._path(operation.path)
-        path.unlink()
+        path.unlink(missing_ok=True)
         return {"status": "completed", "output": f"Deleted {operation.path}"}
 
 @function_tool
 def test_build_model(ctx: RunContextWrapper[RunContext]) -> str:
     """Test the current model.py to ensure it builds correctly. Call this after editing model.py."""
+    logger.info("test_build_model called")
     model_path = ctx.context.source_dir / "model.py"
     if not model_path.exists():
         return "Error: model.py does not exist yet."
@@ -81,6 +91,7 @@ def python_help(target: str) -> str:
     - trimesh.load
     - pathlib.Path.glob
     """
+    logger.info("python_help called for %s", target)
     obj = pydoc.locate(target)
 
     if obj is None:
@@ -101,6 +112,7 @@ def python_inspect(target: str) -> str:
     """
     Return signature, docstring, file location, and source snippet for a Python object.
     """
+    logger.info("python_inspect called for %s", target)
     obj = pydoc.locate(target)
     if obj is None:
         return f"Could not locate {target!r}"
