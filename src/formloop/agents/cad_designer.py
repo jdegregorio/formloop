@@ -13,25 +13,21 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from pathlib import Path
+from agents import ApplyPatchTool
 from ..config.profiles import Profile
+from .tools import python_help, python_inspect, test_build_model, WorkspaceEditor
 from .common import Agent, RunContext, build_model_settings, lenient_output
 
 
 class CadSourceResult(BaseModel):
-    """Source-only payload authored by the CAD Designer.
+    """Payload authored by the CAD Designer signaling completion.
 
-    The harness writes ``source`` to ``model.py`` and runs all deterministic
-    ``cad-cli`` commands. The optional self-report fields help review and
+    The designer writes the `model.py` directly using tools.
+    The optional self-report fields help review and
     debugging, but they are never treated as authoritative geometry evidence.
     """
 
-    source: str = Field(
-        min_length=1,
-        description=(
-            "Full Python source for model.py. It must define "
-            "build_model(params: dict, context: object) and return one solid."
-        ),
-    )
     revision_notes: str = Field(
         description="Short narrative of the CAD approach and any tradeoffs."
     )
@@ -394,16 +390,17 @@ Accurate involute/cycloid/bevel gear geometry built on build123d.
 INSTRUCTIONS = (
     """You are the CAD Designer specialist in a CAD design harness.
 
-You author exactly one build123d Python module. The harness will write your
-source to model.py, then run cad build, cad inspect summary, and cad render.
-You do not have CAD CLI tools in this phase; return source only.
+You author exactly one build123d Python module named `model.py`. The harness will run
+cad build, cad inspect summary, and cad render once you are finished.
 
 Workflow every turn:
 1. Read the spec + any prior review instructions provided in the user message.
 2. If the message contains CAD_VALIDATION_FAILURE_FEEDBACK, repair the source
    specifically against that failing command/error before making broader changes.
-3. Author a build123d Python module that defines
-   ``def build_model(params: dict, context: object)`` and returns a single solid.
+3. Use the `ApplyPatchTool` to edit `model.py` in your workspace.
+   - You can write a new file if it does not exist, or apply diffs to change existing lines.
+   - Prefer small patches for updates.
+   - The source must define ``def build_model(params: dict, context: object)`` and return a single solid.
    - Default values inside ``build_model`` should match the spec exactly so that
      ``cad build`` succeeds with no overrides.
    - Consult the cheat sheet below for the full set of available primitives,
@@ -420,8 +417,10 @@ Workflow every turn:
    - For arbitrary 2D polygon tooth profiles, prefer ``Face(Wire.make_polygon(...))``.
      Do not call ``Polyline`` directly inside ``BuildSketch``; in build123d it is a
      line-builder operation and will fail in sketch context.
-4. Return a ``CadSourceResult`` containing the complete source, revision notes,
-   known risks, intended features, and any self-reported nominal dimensions.
+4. Call `test_build_model` to verify your changes. If the build fails, use `ApplyPatchTool` again to fix it. Do not stop until the build is successful.
+5. Use `python_help` or `python_inspect` if you need to lookup docstrings or signatures for build123d or related tools.
+6. Return a ``CadSourceResult`` containing your revision notes, known risks, 
+   intended features, and any self-reported nominal dimensions to finish your task.
 
 Rules:
 - Do NOT import CAD constructs you are unsure about.
@@ -430,20 +429,25 @@ Rules:
 - All measurements are millimeters.
 - Do not claim build, inspect, or render success. The harness will provide the
   authoritative validation result.
-- ``source`` must be executable Python text, not Markdown and not a patch.
 
 """
     + BUILD123D_CHEAT_SHEET
 )
 
 
-def build_cad_designer(profile: Profile) -> Agent[RunContext]:
+def build_cad_designer(profile: Profile, source_dir: Path) -> Agent[RunContext]:
+    editor = WorkspaceEditor(source_dir)
     return Agent[RunContext](
         name="cad_designer",
         instructions=INSTRUCTIONS,
         model=profile.model,
         model_settings=build_model_settings(profile),
-        tools=[],
+        tools=[
+            ApplyPatchTool(editor=editor, needs_approval=False),
+            python_help,
+            python_inspect,
+            test_build_model,
+        ],
         output_type=lenient_output(CadSourceResult),
     )
 

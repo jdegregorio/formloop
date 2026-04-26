@@ -316,7 +316,7 @@ class RunDriver:
         return result.final_output.model_dump()
 
     async def design_revision(self, designer_input: str, run_ctx: RunContext, profile: Profile):
-        designer_agent = build_cad_designer(profile)
+        designer_agent = build_cad_designer(profile, source_dir=run_ctx.source_dir)
         start = time.monotonic()
         logger.info(
             "agent start: cad_designer timeout=%ss max_turns=6",

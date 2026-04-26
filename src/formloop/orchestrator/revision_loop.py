@@ -18,7 +18,7 @@ from ..runtime.cad_cli import (
     cad_inspect_summary,
     cad_render,
 )
-from ..runtime.constrained_python import write_model_source
+
 from ..runtime.subprocess import CliError
 from ..schemas import ProgressEventKind, ReviewDecision, RevisionTrigger
 from ..store.run_store import CandidateBundle
@@ -143,9 +143,9 @@ def _format_designer_input(
         f"Design brief:\n{plan.design_brief}",
         f"Context (JSON):\n{prompt_ctx.to_prompt_text()}",
         (
-            "Return CadSourceResult only. The source must define "
-            "build_model(params: dict, context: object). Do not run or claim "
-            "cad-cli validation; the harness will build, inspect, and render."
+            "Apply patches to model.py to implement the design. Test your changes using "
+            "test_build_model. When successful, return CadSourceResult. The harness will "
+            "do the final deterministic build, inspect, and render."
         ),
     ]
     if failure_feedback is not None:
@@ -207,8 +207,9 @@ def _command_failure(
         elapsed_s=round(elapsed_s, 3),
         debug_artifact_path=str(attempt_dir),
         repair_instructions=[
-            "Return a corrected complete model.py source in CadSourceResult.source.",
-            "Do not call cad-cli yourself; the harness will rerun validation.",
+            "Use ApplyPatchTool to apply a minimal fix to model.py.",
+            "Use test_build_model to ensure your fix resolves the issue.",
+            "Once successful, return CadSourceResult.",
             "Use the failed command stderr/stdout to make the smallest source fix.",
         ],
     )
@@ -236,7 +237,7 @@ def _artifact_failure(
         detail=message,
         debug_artifact_path=str(attempt_dir),
         repair_instructions=[
-            "Return a corrected complete model.py source in CadSourceResult.source.",
+            "Use ApplyPatchTool to apply a fix to model.py.",
             "The command returned successfully but did not produce the required artifact bundle.",
         ],
     )
@@ -286,16 +287,18 @@ def _validate_cad_source(
     source_result: CadSourceResult,
 ) -> CadValidationResult:
     attempt_ordinal, attempt_dir = _next_source_attempt_dir(runtime.run_root)
-    model_path = write_model_source(
-        runtime.run_ctx.source_dir, source_result.source, filename="model.py"
-    )
-    debug_model_path = write_model_source(attempt_dir, source_result.source, filename="model.py")
+    model_path = runtime.run_ctx.source_dir / "model.py"
+    
+    debug_model_path = attempt_dir / "model.py"
+    if model_path.exists():
+        debug_model_path.parent.mkdir(parents=True, exist_ok=True)
+        debug_model_path.write_text(model_path.read_text())
+        
     logger.info(
-        "cad source attempt: ordinal=%d revision_attempt=%d source_attempt=%d bytes=%d path=%s",
+        "cad source attempt: ordinal=%d revision_attempt=%d source_attempt=%d path=%s",
         attempt_ordinal,
         revision_attempt,
         source_attempt,
-        len(source_result.source.encode("utf-8")),
         attempt_dir,
     )
     validation = CadValidationResult(
@@ -537,7 +540,6 @@ async def _author_and_validate_source(
             data={
                 "revision_attempt": revision_attempt,
                 "source_attempt": source_attempt,
-                "bytes": len(source_result.source.encode("utf-8")),
                 "known_risks": list(source_result.known_risks)[:3],
             },
         )
