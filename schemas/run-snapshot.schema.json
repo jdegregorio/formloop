@@ -184,6 +184,14 @@
       "default": null,
       "title": "Latest Review Summary Path"
     },
+    "research_findings": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Research Findings",
+      "type": "array"
+    },
     "revisions": {
       "items": {
         "type": "string"

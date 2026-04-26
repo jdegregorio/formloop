@@ -31,6 +31,7 @@ class RunSnapshot(SchemaModel):
     current_spec: dict[str, Any] = Field(default_factory=dict)
     current_revision_name: str | None = None
     revisions: list[str] = Field(default_factory=list)
+    research_findings: list[dict[str, Any]] = Field(default_factory=list)
 
     latest_review_decision: ReviewDecision | None = None
     latest_review_summary_path: str | None = None

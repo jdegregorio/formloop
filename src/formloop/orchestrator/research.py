@@ -46,6 +46,11 @@ async def research_phase(
             continue
         findings.append(res)
     logger.info("research phase: complete findings=%d failures=%d", len(findings), failures)
+
+    fresh = ctx.load_run(run.run_name)
+    fresh.research_findings = findings
+    ctx.save_run(fresh)
+
     ctx.emit(
         run.run_name,
         ProgressEventKind.research_completed,

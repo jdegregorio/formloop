@@ -27,6 +27,7 @@ class SnapshotProjector:
             current_spec=run.current_spec,
             current_revision_name=run.current_revision_id,
             revisions=list(run.revisions),
+            research_findings=run.research_findings,
         )
         if run.current_revision_id:
             rev_layout = layout.revision(run.current_revision_id)
