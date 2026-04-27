@@ -8,21 +8,13 @@ import tempfile
 from pathlib import Path
 
 
-def _default_file_mode() -> int:
-    """Return Path.write_text-like create mode (respecting process umask)."""
-
-    umask = os.umask(0)
-    os.umask(umask)
-    return 0o666 & ~umask
-
-
 def atomic_write_text(path: Path, text: str) -> None:
     """Atomic write via tmp file + os.replace, creating parent dirs."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path: Path | None = None
     replaced = False
-    target_mode = _default_file_mode()
+    target_mode: int | None = None
     if path.exists():
         target_mode = stat.S_IMODE(path.stat().st_mode)
     try:
@@ -34,7 +26,8 @@ def atomic_write_text(path: Path, text: str) -> None:
             prefix=f"{path.name}.",
         ) as tmp:
             temp_path = Path(tmp.name)
-            os.fchmod(tmp.fileno(), target_mode)
+            if target_mode is not None and hasattr(os, "fchmod"):
+                os.fchmod(tmp.fileno(), target_mode)
             tmp.write(text)
             tmp.flush()
             os.fsync(tmp.fileno())
