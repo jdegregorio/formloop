@@ -9,12 +9,29 @@ bounded and inspectable outside the model loop.
 
 from __future__ import annotations
 
+import importlib
+import inspect
+import pydoc
+import tempfile
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from ..config.profiles import Profile
-from .common import Agent, RunContext, build_model_settings, lenient_output
+from ..runtime.cad_cli import cad_build
+from .common import (
+    Agent,
+    ApplyPatchOperation,
+    ApplyPatchResult,
+    ApplyPatchTool,
+    RunContext,
+    RunContextWrapper,
+    apply_diff,
+    build_model_settings,
+    function_tool,
+    lenient_output,
+)
 
 
 class CadSourceResult(BaseModel):
@@ -394,15 +411,19 @@ Accurate involute/cycloid/bevel gear geometry built on build123d.
 INSTRUCTIONS = (
     """You are the CAD Designer specialist in a CAD design harness.
 
-You author exactly one build123d Python module. The harness will write your
-source to model.py, then run cad build, cad inspect summary, and cad render.
-You do not have CAD CLI tools in this phase; return source only.
+You author exactly one build123d Python module. The harness owns final artifact
+generation (build/inspect/render/persist). Your responsibility is to produce a
+correct model.py and self-verify it with a deterministic build check.
 
 Workflow every turn:
 1. Read the spec + any prior review instructions provided in the user message.
-2. If the message contains CAD_VALIDATION_FAILURE_FEEDBACK, repair the source
+2. If a model.py already exists, prefer surgical edits:
+   - use ``read_model_source`` to inspect current source,
+   - use ``apply_patch`` for targeted changes to model.py,
+   - avoid rewriting the entire file unless necessary.
+3. If the message contains CAD_VALIDATION_FAILURE_FEEDBACK, repair the source
    specifically against that failing command/error before making broader changes.
-3. Author a build123d Python module that defines
+4. Author a build123d Python module that defines
    ``def build_model(params: dict, context: object)`` and returns a single solid.
    - Default values inside ``build_model`` should match the spec exactly so that
      ``cad build`` succeeds with no overrides.
@@ -420,7 +441,9 @@ Workflow every turn:
    - For arbitrary 2D polygon tooth profiles, prefer ``Face(Wire.make_polygon(...))``.
      Do not call ``Polyline`` directly inside ``BuildSketch``; in build123d it is a
      line-builder operation and will fail in sketch context.
-4. Return a ``CadSourceResult`` containing the complete source, revision notes,
+5. Before finishing, run ``run_build_self_check`` and ensure it succeeds.
+   - If build fails, repair and retry before returning.
+6. Return a ``CadSourceResult`` containing the complete source, revision notes,
    known risks, intended features, and any self-reported nominal dimensions.
 
 Rules:
@@ -436,14 +459,140 @@ Rules:
     + BUILD123D_CHEAT_SHEET
 )
 
+def _safe_model_path(ctx: RunContext) -> str:
+    return str((ctx.source_dir / "model.py").resolve())
 
-def build_cad_designer(profile: Profile) -> Agent[RunContext]:
+
+def _read_source(path: str) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
+
+@function_tool
+def read_model_source(ctx: RunContextWrapper[RunContext]) -> str:
+    """Return current model.py contents from the working source directory."""
+    return _read_source(_safe_model_path(ctx.context))
+
+
+class WorkspaceEditor:
+    """ApplyPatchTool editor scoped to the run source directory."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root.resolve()
+
+    def _resolve(self, relative_path: str, *, create_parent: bool = False) -> Path:
+        target = (self.root / relative_path).resolve()
+        try:
+            target.relative_to(self.root)
+        except ValueError as exc:  # pragma: no cover - defensive
+            raise RuntimeError(f"path escapes workspace: {relative_path}") from exc
+        if create_parent:
+            target.parent.mkdir(parents=True, exist_ok=True)
+        return target
+
+    @staticmethod
+    def _validate_model_path(path: str) -> None:
+        normalized = path.strip().replace("\\", "/")
+        if normalized != "model.py":
+            raise RuntimeError("CAD Designer may only patch model.py")
+
+    def create_file(self, operation: ApplyPatchOperation) -> ApplyPatchResult:
+        self._validate_model_path(operation.path)
+        target = self._resolve(operation.path, create_parent=True)
+        content = apply_diff("", operation.diff or "", mode="create")
+        target.write_text(content, encoding="utf-8")
+        return ApplyPatchResult(output=f"Created {operation.path}")
+
+    def update_file(self, operation: ApplyPatchOperation) -> ApplyPatchResult:
+        self._validate_model_path(operation.path)
+        target = self._resolve(operation.path)
+        original = target.read_text(encoding="utf-8")
+        patched = apply_diff(original, operation.diff or "")
+        target.write_text(patched, encoding="utf-8")
+        return ApplyPatchResult(output=f"Updated {operation.path}")
+
+    def delete_file(self, operation: ApplyPatchOperation) -> ApplyPatchResult:
+        self._validate_model_path(operation.path)
+        target = self._resolve(operation.path)
+        target.unlink(missing_ok=True)
+        return ApplyPatchResult(output=f"Deleted {operation.path}")
+
+
+@function_tool
+def run_build_self_check(ctx: RunContextWrapper[RunContext]) -> str:
+    """Run deterministic cad build against model.py for syntax/runtime verification."""
+    model_path = ctx.context.source_dir / "model.py"
+    if not model_path.is_file():
+        return "Build check failed: model.py does not exist yet."
+    with tempfile.TemporaryDirectory(
+        prefix="designer-build-", dir=str(ctx.context.run_root / "_work")
+    ) as tmp:
+        try:
+            result = cad_build(
+                model_path=model_path,
+                output_dir=Path(tmp),
+                timeout=ctx.context.timeouts.cad_build,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return f"Build check failed: {type(exc).__name__}: {exc}"
+    return f"Build check passed: {result.summary}"
+
+
+@function_tool
+def python_help(target: str) -> str:
+    """Return pydoc help for an importable Python target (module/class/function)."""
+    obj = pydoc.locate(target)
+    if obj is None:
+        try:
+            obj = importlib.import_module(target)
+        except Exception as exc:  # noqa: BLE001
+            return f"Could not locate or import {target!r}: {type(exc).__name__}: {exc}"
+    try:
+        return pydoc.render_doc(obj, renderer=pydoc.plaintext)[:12_000]
+    except Exception as exc:  # noqa: BLE001
+        return f"Could not render docs for {target!r}: {type(exc).__name__}: {exc}"
+
+
+@function_tool
+def python_inspect(target: str) -> str:
+    """Return signature/doc/source snippets for an importable Python target."""
+    obj = pydoc.locate(target)
+    if obj is None:
+        return f"Could not locate {target!r}"
+    parts = [f"Target: {target}", f"Type: {type(obj)}"]
+    try:
+        parts.append(f"Signature: {inspect.signature(obj)}")
+    except Exception:  # noqa: BLE001
+        parts.append("Signature: <unavailable>")
+    try:
+        parts.append(f"File: {inspect.getfile(obj)}")
+    except Exception:  # noqa: BLE001
+        pass
+    doc = inspect.getdoc(obj)
+    if doc:
+        parts.append("\nDocstring:\n" + doc[:4000])
+    try:
+        parts.append("\nSource:\n" + inspect.getsource(obj)[:6000])
+    except Exception:  # noqa: BLE001
+        pass
+    return "\n".join(parts)
+
+
+def build_cad_designer(profile: Profile, run_ctx: RunContext) -> Agent[RunContext]:
+    patch_tool = ApplyPatchTool(editor=WorkspaceEditor(run_ctx.source_dir))
     return Agent[RunContext](
         name="cad_designer",
         instructions=INSTRUCTIONS,
         model=profile.model,
         model_settings=build_model_settings(profile),
-        tools=[],
+        tools=[
+            read_model_source,
+            patch_tool,
+            run_build_self_check,
+            python_help,
+            python_inspect,
+        ],
         output_type=lenient_output(CadSourceResult),
     )
 

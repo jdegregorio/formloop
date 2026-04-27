@@ -17,12 +17,15 @@ from typing import Any
 from agents import (  # noqa: F401 -- re-exported for the rest of the package
     Agent,
     AgentOutputSchema,
+    ApplyPatchTool,
     ModelSettings,
     RunContextWrapper,
     Runner,
     WebSearchTool,
+    apply_diff,
     function_tool,
 )
+from agents.editor import ApplyPatchOperation, ApplyPatchResult
 from openai.types.shared import Reasoning
 
 from ..config.profiles import Profile, Timeouts
@@ -98,6 +101,9 @@ class PromptContext:
 __all__ = [
     "Agent",
     "AgentOutputSchema",
+    "ApplyPatchOperation",
+    "ApplyPatchResult",
+    "ApplyPatchTool",
     "ModelSettings",
     "PromptContext",
     "Reasoning",
@@ -105,6 +111,7 @@ __all__ = [
     "RunContextWrapper",
     "Runner",
     "WebSearchTool",
+    "apply_diff",
     "build_model_settings",
     "function_tool",
     "lenient_output",
