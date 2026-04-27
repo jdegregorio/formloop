@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import json
 import importlib.util
+import os
+import stat
 import threading
 from pathlib import Path
+
+import pytest
 
 
 def _load_atomic_write_text():
@@ -74,3 +78,33 @@ def test_atomic_write_text_threaded_stress_writes_valid_json(tmp_path: Path) -> 
     final_payload = json.loads(target.read_text(encoding="utf-8"))
     assert final_payload["message"] == "atomic-write"
     assert len(final_payload["padding"]) == 4096
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permissions semantics")
+def test_atomic_write_text_preserves_existing_file_permissions(tmp_path: Path) -> None:
+    target = tmp_path / "snapshot.json"
+    target.write_text('{"initial":true}', encoding="utf-8")
+    target.chmod(0o644)
+
+    atomic_write_text(target, '{"updated":true}')
+
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX directory fsync semantics")
+def test_atomic_write_text_swallows_parent_open_fail_after_replace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "run.json"
+    real_open = os.open
+
+    def open_that_fails_for_directory(path: str | os.PathLike[str], flags: int, *args: object) -> int:
+        if Path(path) == target.parent:
+            raise OSError("cannot open parent")
+        return real_open(path, flags, *args)
+
+    monkeypatch.setattr(os, "open", open_that_fails_for_directory)
+
+    atomic_write_text(target, '{"ok":true}')
+
+    assert json.loads(target.read_text(encoding="utf-8"))["ok"] is True
