@@ -38,8 +38,14 @@ from formloop.config.profiles import (
 )
 from formloop.orchestrator.narrator import Narrator
 from formloop.orchestrator.run_driver import DriveRequest, RunDriver
-from formloop.runtime.subprocess import CliError
-from formloop.schemas import ProgressEventKind
+from formloop.runtime.cad_cli import (
+    BoundingBoxRecord,
+    CadBuildResult,
+    CadInspectResult,
+    CadRenderResult,
+)
+from formloop.schemas import ProgressEventKind, ReviewDecision
+from formloop.schemas.review_summary import ReviewSummary
 
 pytestmark = pytest.mark.asyncio
 
@@ -72,16 +78,55 @@ def _install_runner_stub(monkeypatch) -> None:
     """Replace ``Runner.run`` with a deterministic dispatcher.
 
     Returns canned outputs for the manager, the cad designer (source only),
-    and the manager-final agent. Researcher isn't called because the plan
-    has no research topics.
+    the reviewer, and the manager-final agent. Researcher isn't called because
+    the plan has no research topics.
     """
 
-    def fake_cad_build(*args, **kwargs):
-        raise CliError(
-            cmd=["cad", "build"],
-            returncode=1,
-            stdout="",
-            stderr="stubbed build failure",
+    def fake_cad_build(*, model_path: Path, output_dir: Path, **kwargs):  # noqa: ARG001
+        output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "model.step").write_text("step", encoding="utf-8")
+        (output_dir / "model.glb").write_text("glb", encoding="utf-8")
+        metadata = output_dir / "build-metadata.json"
+        metadata.write_text("{}", encoding="utf-8")
+        return CadBuildResult(
+            command="cad build",
+            summary="built",
+            output_dir=str(output_dir),
+            metadata_path=str(metadata),
+            artifacts=[],
+            bounding_box=BoundingBoxRecord(
+                min_corner=[0, 0, 0],
+                max_corner=[20, 20, 20],
+                size=[20, 20, 20],
+            ),
+            volume=8000,
+        )
+
+    def fake_cad_inspect(artifact_path: Path, **kwargs):  # noqa: ARG001
+        return CadInspectResult(
+            command="cad inspect summary",
+            summary="inspected",
+            artifact_path=str(artifact_path),
+            mode="summary",
+            data={"bbox": {"size": [20, 20, 20]}},
+        )
+
+    def fake_cad_render(*, glb_path: Path, output_dir: Path, **kwargs):  # noqa: ARG001
+        output_dir.mkdir(parents=True, exist_ok=True)
+        metadata = output_dir / "render-metadata.json"
+        metadata.write_text("{}", encoding="utf-8")
+        (output_dir / "sheet.png").write_bytes(b"sheet")
+        for name in ("front", "back", "left", "right", "top", "bottom", "iso"):
+            (output_dir / f"{name}.png").write_bytes(name.encode())
+        return CadRenderResult(
+            command="cad render",
+            summary="rendered",
+            input_glb=str(glb_path),
+            output_dir=str(output_dir),
+            metadata_path=str(metadata),
+            artifacts=[],
+            blender_bin="stub",
+            render_spec={},
         )
 
     async def fake_run(agent, input, *args, **kwargs):  # noqa: A002
@@ -119,17 +164,29 @@ def _install_runner_stub(monkeypatch) -> None:
                     self_reported_dimensions={"size": 20},
                 )
             )
+        if name == "reviewer":
+            return _FakeResult(
+                final_output=ReviewSummary(
+                    decision=ReviewDecision.pass_,
+                    confidence=0.9,
+                    key_findings=["cube dimensions and render are acceptable"],
+                )
+            )
         if name == "manager_final":
             return _FakeResult(
                 final_output=ManagerFinalAnswer(
-                    text="we did not deliver a revision",
-                    delivered_revision_name=None,
+                    text="delivered rev-001",
+                    delivered_revision_name="rev-001",
                 )
             )
         raise AssertionError(f"unexpected agent in stub: {name!r}")
 
     monkeypatch.setattr("formloop.orchestrator.run_driver.Runner.run", fake_run)
     monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_build", fake_cad_build)
+    monkeypatch.setattr(
+        "formloop.orchestrator.revision_loop.cad_inspect_summary", fake_cad_inspect
+    )
+    monkeypatch.setattr("formloop.orchestrator.revision_loop.cad_render", fake_cad_render)
 
 
 async def _drive(tmp_path: Path, monkeypatch, narrator: Narrator) -> tuple[Any, list]:
@@ -150,16 +207,14 @@ async def test_narration_events_emitted_at_each_milestone(tmp_path, monkeypatch)
     narration = [ev for ev in events if ev.kind is ProgressEventKind.narration]
     phases = [ev.phase for ev in narration]
 
-    # Post-op-feedback: we narrate only at milestones that carry run-specific
-    # content — plan-end (normalized spec + assumptions) and revision-built
-    # (designer output). No research (empty topics), no retry (first attempt),
-    # no review (designer stub fails so we never reach review), no finalize.
-    assert phases == ["plan", "revision"], phases
+    assert phases == ["plan", "revision", "review"], phases
     # Fallback strings should be the captured messages (LLM is off).
     assert any("normalized" in ev.message for ev in narration)
     assert any(
-        "build" in ev.message.lower() or "designer" in ev.message.lower() for ev in narration
+        "build" in ev.message.lower() or "designer" in ev.message.lower()
+        for ev in narration
     )
+    assert any("review" in ev.message.lower() for ev in narration)
     # Snapshot reflects the latest one.
     snap = driver_snapshot(tmp_path, result["run_name"])
     assert snap["latest_narration"] == narration[-1].message
@@ -199,7 +254,7 @@ async def test_run_survives_narrator_failure(tmp_path, monkeypatch) -> None:
     result, events = await _drive(
         tmp_path, monkeypatch, narrator=BrokenNarrator(fallback_only=True)
     )
-    # Run still completed (no delivered revision because designer stub fails).
+    # Run still completes even when presentation narration fails.
     assert result["status"] in ("succeeded", "failed")
     narration = [ev for ev in events if ev.kind is ProgressEventKind.narration]
     assert narration, "driver should emit narration events even when narrator raises"
@@ -347,3 +402,39 @@ async def test_research_topic_uses_configured_max_turns(tmp_path, monkeypatch) -
     assert "Turn budget: 3 total turns." in captured["input"]
     assert "Final answer limit: 500 words maximum." in captured["input"]
     assert finding["topic"] == "topic-123"
+
+
+async def test_cad_designer_uses_configured_max_turns(tmp_path, monkeypatch) -> None:
+    config = replace(_stub_config(tmp_path), max_cad_designer_turns=12)
+    driver = RunDriver(config, narrator=Narrator(fallback_only=True))
+    _, run_ctx, profile, _ = driver.create_shell(DriveRequest(prompt="a 20mm cube"))
+
+    captured: dict[str, Any] = {}
+
+    async def fake_run(agent, input, *args, **kwargs):  # noqa: A002, ARG001
+        captured["agent_name"] = getattr(agent, "name", "")
+        captured["max_turns"] = kwargs.get("max_turns")
+        captured["has_context"] = kwargs.get("context") is run_ctx
+        return _FakeResult(final_output=_source_result())
+
+    def _source_result() -> CadSourceResult:
+        return CadSourceResult(
+            source=(
+                "from build123d import Box\n\n"
+                "def build_model(params: dict, context: object):\n"
+                "    return Box(20, 20, 20)\n"
+            ),
+            revision_notes="stub source",
+            known_risks=[],
+            self_reported_dimensions={"size": 20},
+        )
+
+    monkeypatch.setattr("formloop.orchestrator.run_driver.Runner.run", fake_run)
+    result = await driver.design_revision("make a cube", run_ctx, profile)
+
+    assert captured == {
+        "agent_name": "cad_designer",
+        "max_turns": 12,
+        "has_context": True,
+    }
+    assert result.source

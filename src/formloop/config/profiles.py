@@ -54,6 +54,7 @@ class HarnessConfig:
     profiles: dict[str, Profile]
     api: ApiConfig
     repo_root: Path
+    max_cad_designer_turns: int = 12
 
     def profile(self, name: str | None = None) -> Profile:
         n = name or self.default_profile
@@ -114,6 +115,7 @@ def load_config(path: Path | None = None) -> HarnessConfig:
         max_revisions=int(data.get("max_revisions", 5)),
         max_research_topics=max(1, int(data.get("max_research_topics", 8))),
         max_research_turns=max(1, int(data.get("max_research_turns", 3))),
+        max_cad_designer_turns=max(1, int(data.get("max_cad_designer_turns", 12))),
         runs_dir=(root / str(data.get("runs_dir", "var/runs"))).resolve(),
         evals_dir=(root / str(data.get("evals_dir", "var/evals"))).resolve(),
         timeouts=timeouts,

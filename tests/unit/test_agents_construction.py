@@ -13,6 +13,7 @@ from formloop.agents import (
     ManagerFinalAnswer,
     ManagerPlan,
     ResearchFinding,
+    RunContext,
     build_cad_designer,
     build_design_researcher,
     build_judge,
@@ -20,7 +21,7 @@ from formloop.agents import (
     build_manager_plan,
     build_reviewer,
 )
-from formloop.config.profiles import Profile
+from formloop.config.profiles import Profile, Timeouts
 from formloop.schemas import JudgeOutput, ReviewSummary
 
 
@@ -56,11 +57,30 @@ def test_design_researcher_has_web_search(profile: Profile) -> None:
     assert "WebSearchTool" in tool_names
 
 
-def test_cad_designer_is_source_only(profile: Profile) -> None:
-    agent = build_cad_designer(profile)
+def test_cad_designer_is_source_only(profile: Profile, tmp_path) -> None:
+    run_root = tmp_path / "run-0001"
+    source_dir = run_root / "_work" / "source"
+    source_dir.mkdir(parents=True)
+    run_ctx = RunContext(
+        run_name="run-0001",
+        run_root=run_root,
+        source_dir=source_dir,
+        profile=profile,
+        timeouts=Timeouts(
+            cad_build=1,
+            cad_render=1,
+            cad_inspect=1,
+            cad_compare=1,
+            agent_run=1,
+        ),
+    )
+    agent = build_cad_designer(profile, run_ctx)
     assert _underlying_type(agent) is CadSourceResult
     tool_names = {getattr(t, "name", t.__class__.__name__) for t in agent.tools}
-    assert tool_names == set()
+    assert {"read_model_source", "run_build_self_check", "python_help", "python_inspect"} <= (
+        tool_names
+    )
+    assert any("ApplyPatch" in name or "apply_patch" in name for name in tool_names)
     assert CadRevisionResult is not CadSourceResult
     assert "bd_warehouse" in agent.instructions
     assert "py_gearworks" in agent.instructions
