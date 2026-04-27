@@ -32,6 +32,8 @@ def atomic_write_text(path: Path, text: str) -> None:
             prefix=f"{path.name}.",
         ) as tmp:
             temp_path = Path(tmp.name)
+            if desired_mode is not None and hasattr(os, "fchmod"):
+                os.fchmod(tmp.fileno(), desired_mode)
             tmp.write(text)
             tmp.flush()
             os.fsync(tmp.fileno())
