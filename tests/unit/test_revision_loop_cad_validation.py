@@ -237,11 +237,7 @@ async def test_successful_first_source_creates_one_persisted_revision(
     attempt_dir = runtime.run_root / "_work" / "source_attempts" / "attempt-001"
     assert (attempt_dir / "model.py").is_file()
     validation = json.loads((attempt_dir / "validation-result.json").read_text())
-    assert [cmd["command"] for cmd in validation["commands"]] == [
-        "cad build",
-        "cad inspect summary",
-        "cad render",
-    ]
+    assert [cmd["command"] for cmd in validation["commands"]] == ["cad build"]
     assert all(cmd["status"] == "ok" for cmd in validation["commands"])
     assert all(cmd["returncode"] == 0 for cmd in validation["commands"])
     assert all("duration_s" in cmd for cmd in validation["commands"])
@@ -316,7 +312,7 @@ async def test_build_failure_with_traceback_sends_to_feedback(tmp_path, monkeypa
     assert "Traceback (most recent call last): ..." in ctx.designer_inputs[1]
 
 
-async def test_render_failure_sends_feedback_and_retries(tmp_path, monkeypatch) -> None:
+async def test_render_failure_aborts_revision_without_source_retry(tmp_path, monkeypatch) -> None:
     store, runtime = _runtime(tmp_path)
     ctx = _FakeContext(store, [_source("render bad"), _source("render fixed")])
     calls = {"render": 0}
@@ -339,10 +335,9 @@ async def test_render_failure_sends_feedback_and_retries(tmp_path, monkeypatch) 
 
     delivered = await revision_loop_phase(ctx, runtime, plan=_plan(), findings=[], max_revisions=1)
 
-    assert delivered == "rev-001"
-    assert len(ctx.designer_inputs) == 2
-    assert '"failed_phase": "render"' in ctx.designer_inputs[1]
-    assert calls["render"] == 2
+    assert delivered is None
+    assert len(ctx.designer_inputs) == 1
+    assert calls["render"] == 1
 
 
 async def test_persisted_revisions_without_review_pass_are_not_delivered(
