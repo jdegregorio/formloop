@@ -108,3 +108,21 @@ def test_atomic_write_text_swallows_parent_open_fail_after_replace(
     atomic_write_text(target, '{"ok":true}')
 
     assert json.loads(target.read_text(encoding="utf-8"))["ok"] is True
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX umask semantics")
+def test_atomic_write_text_new_file_does_not_mutate_process_umask(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "new.json"
+    original_umask = os.umask(0o027)
+    os.umask(original_umask)
+
+    def fail_if_called(mask: int) -> int:
+        raise AssertionError(f"os.umask should not be called, got {mask:o}")
+
+    monkeypatch.setattr(os, "umask", fail_if_called)
+
+    atomic_write_text(target, '{"ok":true}')
+
+    assert json.loads(target.read_text(encoding="utf-8"))["ok"] is True

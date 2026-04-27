@@ -19,10 +19,9 @@ def atomic_write_text(path: Path, text: str) -> None:
     try:
         desired_mode = stat.S_IMODE(path.stat().st_mode)
     except FileNotFoundError:
-        if os.name == "posix":
-            current_umask = os.umask(0)
-            os.umask(current_umask)
-            desired_mode = 0o666 & ~current_umask
+        # For new targets, keep the temp file's existing mode so the process
+        # umask is respected without mutating global process state.
+        pass
 
     try:
         with tempfile.NamedTemporaryFile(
