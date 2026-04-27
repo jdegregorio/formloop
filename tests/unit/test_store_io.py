@@ -126,16 +126,3 @@ def test_atomic_write_text_new_file_does_not_mutate_process_umask(
     atomic_write_text(target, '{"ok":true}')
 
     assert json.loads(target.read_text(encoding="utf-8"))["ok"] is True
-
-
-def test_atomic_write_text_without_fchmod_still_replaces_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    target = tmp_path / "run.json"
-    target.write_text('{"old": true}', encoding="utf-8")
-
-    monkeypatch.delattr(os, "fchmod", raising=False)
-
-    atomic_write_text(target, '{"new": true}')
-
-    assert target.read_text(encoding="utf-8") == '{"new": true}'

@@ -38,7 +38,7 @@ def atomic_write_text(path: Path, text: str) -> None:
             tmp.flush()
             os.fsync(tmp.fileno())
 
-        if desired_mode is not None and not hasattr(os, "fchmod"):
+        if desired_mode is not None:
             os.chmod(temp_path, desired_mode)
 
         os.replace(temp_path, path)
