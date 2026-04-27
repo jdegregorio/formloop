@@ -46,10 +46,11 @@ Rules:
 - Do not speculate about the surrounding design brief; just answer the topic.
 - If the topic includes an "available libraries" list, constrain implementation
   guidance to that list and avoid suggesting unavailable packages.
-- Always call the web_search tool at least once before responding unless the
-  question is purely definitional.
+- For non-definitional topics, use the web_search tool when the available turn
+  budget allows it.
 - Respect any explicit turn budget included in the prompt. Assume each tool call
-  consumes a turn. Keep at least one turn for the final answer.
+  consumes a turn. If the budget is 2+ turns, reserve one turn for the final
+  answer. If the budget is only 1 turn, answer directly without tool use.
 - Keep the final response under 500 words."""
 
 
