@@ -31,6 +31,16 @@ logger = logging.getLogger(__name__)
 MAX_SOURCE_DEBUG_LOOPS = 3
 MAX_SOURCE_ATTEMPTS = 1 + MAX_SOURCE_DEBUG_LOOPS
 SNIPPET_CHARS = 4000
+REQUIRED_RENDER_ARTIFACTS = (
+    "sheet.png",
+    "front.png",
+    "back.png",
+    "left.png",
+    "right.png",
+    "top.png",
+    "bottom.png",
+    "iso.png",
+)
 
 
 class CadCommandEvidence(BaseModel):
@@ -103,6 +113,10 @@ def _write_json(path: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+def _missing_render_artifacts(render_out: Path) -> list[str]:
+    return [name for name in REQUIRED_RENDER_ARTIFACTS if not (render_out / name).is_file()]
+
+
 def _clip(text: str | None) -> str:
     text = text or ""
     if len(text) <= SNIPPET_CHARS:
@@ -145,7 +159,7 @@ def _format_designer_input(
         (
             "Return CadSourceResult only. The source must define "
             "build_model(params: dict, context: object). Do not run or claim "
-            "cad-cli validation; the harness will build, inspect, and render."
+            "final cad-cli artifact generation; the harness will build, inspect, and render."
         ),
     ]
     if failure_feedback is not None:
@@ -370,118 +384,12 @@ def _validate_cad_source(
         _write_validation_artifacts(attempt_dir, source_result=source_result, validation=validation)
         return validation
 
-    start = time.monotonic()
-    logger.info(
-        "cad validation start: command=cad inspect summary revision_attempt=%d "
-        "source_attempt=%d timeout=%ss",
-        revision_attempt,
-        source_attempt,
-        runtime.run_ctx.timeouts.cad_inspect,
-    )
-    try:
-        inspect: CadInspectResult = cad_inspect_summary(
-            build.step_path,
-            timeout=runtime.run_ctx.timeouts.cad_inspect,
-        )
-    except Exception as exc:  # noqa: BLE001
-        elapsed = time.monotonic() - start
-        evidence, feedback = _command_failure(
-            revision_attempt=revision_attempt,
-            source_attempt=source_attempt,
-            attempt_dir=attempt_dir,
-            phase="inspect",
-            command="cad inspect summary",
-            timeout_s=runtime.run_ctx.timeouts.cad_inspect,
-            elapsed_s=elapsed,
-            exc=exc,
-        )
-        validation.commands.append(evidence)
-        validation.failure_feedback = feedback
-        _write_validation_artifacts(attempt_dir, source_result=source_result, validation=validation)
-        return validation
-    elapsed = time.monotonic() - start
-    inspect_evidence = _successful_command(
-        command="cad inspect summary",
-        duration_s=elapsed,
-        timeout_s=runtime.run_ctx.timeouts.cad_inspect,
-        summary=inspect.summary,
-    )
-    validation.commands.append(inspect_evidence)
-    validation.inspect_ok = True
-    validation.inspect_result = inspect.model_dump()
-    _write_json(attempt_dir / "inspect-summary.json", inspect.model_dump())
-
-    render_dir = attempt_dir / "render"
-    start = time.monotonic()
-    logger.info(
-        "cad validation start: command=cad render revision_attempt=%d "
-        "source_attempt=%d timeout=%ss",
-        revision_attempt,
-        source_attempt,
-        runtime.run_ctx.timeouts.cad_render,
-    )
-    try:
-        render: CadRenderResult = cad_render(
-            glb_path=build.glb_path,
-            output_dir=render_dir,
-            timeout=runtime.run_ctx.timeouts.cad_render,
-        )
-    except Exception as exc:  # noqa: BLE001
-        elapsed = time.monotonic() - start
-        evidence, feedback = _command_failure(
-            revision_attempt=revision_attempt,
-            source_attempt=source_attempt,
-            attempt_dir=attempt_dir,
-            phase="render",
-            command="cad render",
-            timeout_s=runtime.run_ctx.timeouts.cad_render,
-            elapsed_s=elapsed,
-            exc=exc,
-        )
-        validation.commands.append(evidence)
-        validation.failure_feedback = feedback
-        _write_validation_artifacts(attempt_dir, source_result=source_result, validation=validation)
-        return validation
-    elapsed = time.monotonic() - start
-    render_evidence = _successful_command(
-        command="cad render",
-        duration_s=elapsed,
-        timeout_s=runtime.run_ctx.timeouts.cad_render,
-        summary=render.summary,
-        output_dir=render.output_dir,
-        metadata_path=render.metadata_path,
-    )
-    validation.commands.append(render_evidence)
-    validation.render_ok = True
-    validation.render_result = render.model_dump()
-    _write_json(attempt_dir / "render-result.json", render.model_dump())
-    missing_render = [
-        str(path)
-        for path in (render.sheet_path, Path(render.metadata_path), *render.view_paths())
-        if not path.is_file()
-    ]
-    if missing_render:
-        validation.failure_feedback = _artifact_failure(
-            revision_attempt=revision_attempt,
-            source_attempt=source_attempt,
-            attempt_dir=attempt_dir,
-            phase="render",
-            command="cad render",
-            message="cad render did not produce required artifacts: " + ", ".join(missing_render),
-            evidence=render_evidence,
-        )
-        validation.render_ok = False
-        _write_validation_artifacts(attempt_dir, source_result=source_result, validation=validation)
-        return validation
-
     validation.ok = True
     _write_validation_artifacts(attempt_dir, source_result=source_result, validation=validation)
     runtime.run_ctx.notes["last_source_attempt_dir"] = str(attempt_dir)
     runtime.run_ctx.notes["last_build"] = build.model_dump()
-    runtime.run_ctx.notes["last_inspect"] = inspect.model_dump()
-    runtime.run_ctx.notes["last_render"] = render.model_dump()
     logger.info(
-        "cad validation completed: revision_attempt=%d source_attempt=%d debug_dir=%s",
+        "cad self-validation completed: revision_attempt=%d source_attempt=%d debug_dir=%s",
         revision_attempt,
         source_attempt,
         attempt_dir,
@@ -548,7 +456,7 @@ async def _author_and_validate_source(
             data={
                 "revision_attempt": revision_attempt,
                 "source_attempt": source_attempt,
-                "commands": ["cad build", "cad inspect summary", "cad render"],
+                "commands": ["cad build"],
             },
         )
         validation = _validate_cad_source(
@@ -647,8 +555,83 @@ async def revision_loop_phase(
         )
         assert source_result is not None
         cad_out = _cad_revision_from_validation(source_result, validation)
+        if not validation.ok:
+            ctx.emit(
+                run.run_name,
+                ProgressEventKind.breadcrumb,
+                message="CAD validation exhausted debug loops; not persisting",
+                data={
+                    "attempt": attempt,
+                    "debug_artifact_path": validation.debug_dir,
+                    "build_errors": cad_out.build_errors[:3],
+                },
+            )
+            break
+
+        build_dir = Path(runtime.run_ctx.notes["last_build"]["output_dir"])
+        inspect_src = Path(validation.debug_dir) / "inspect-summary.json"
+        render_dir = Path(validation.debug_dir) / "render"
+        render_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            inspect: CadInspectResult = cad_inspect_summary(
+                build_dir / "model.step",
+                timeout=runtime.run_ctx.timeouts.cad_inspect,
+            )
+            _write_json(inspect_src, inspect.model_dump())
+            validation.inspect_ok = True
+            validation.inspect_result = inspect.model_dump()
+            runtime.run_ctx.notes["last_inspect"] = validation.inspect_result
+        except Exception as exc:  # noqa: BLE001
+            ctx.emit(
+                run.run_name,
+                ProgressEventKind.cad_validation_failed,
+                message=f"final inspect failed: {exc}",
+                data={"attempt": attempt, "debug_artifact_path": validation.debug_dir},
+            )
+            break
+
+        try:
+            render: CadRenderResult = cad_render(
+                glb_path=build_dir / "model.glb",
+                output_dir=render_dir,
+                timeout=runtime.run_ctx.timeouts.cad_render,
+            )
+            validation.render_result = render.model_dump()
+            _write_json(Path(validation.debug_dir) / "render-result.json", validation.render_result)
+        except Exception as exc:  # noqa: BLE001
+            ctx.emit(
+                run.run_name,
+                ProgressEventKind.cad_validation_failed,
+                message=f"final render failed: {exc}",
+                data={"attempt": attempt, "debug_artifact_path": validation.debug_dir},
+            )
+            break
+
+        missing_render_artifacts = _missing_render_artifacts(render_dir)
+        if missing_render_artifacts:
+            ctx.emit(
+                run.run_name,
+                ProgressEventKind.cad_validation_failed,
+                message="final render missing required artifacts",
+                data={
+                    "attempt": attempt,
+                    "debug_artifact_path": validation.debug_dir,
+                    "missing_render_artifacts": missing_render_artifacts,
+                },
+            )
+            break
+        validation.render_ok = True
+
+        staging = _staging_views_dir(runtime.run_root, attempt)
+        staged_views = _stage_views(render_dir, staging)
+
+        build_meta = Path(runtime.run_ctx.notes["last_build"]["metadata_path"])
+        render_meta = Path(render.metadata_path)
+        cad_out.inspect_ok = validation.inspect_ok
+        cad_out.render_ok = validation.render_ok
         logger.info(
-            "revision validation result: attempt=%d build=%s render=%s inspect=%s",
+            "revision build pipeline result: attempt=%d build=%s render=%s inspect=%s",
             attempt,
             cad_out.build_ok,
             cad_out.render_ok,
@@ -657,7 +640,7 @@ async def revision_loop_phase(
         ctx.emit(
             run.run_name,
             ProgressEventKind.revision_built,
-            message=f"harness validation build_ok={cad_out.build_ok} render_ok={cad_out.render_ok}",
+            message=f"harness pipeline build_ok={cad_out.build_ok} render_ok={cad_out.render_ok}",
             data={
                 "build_ok": cad_out.build_ok,
                 "inspect_ok": cad_out.inspect_ok,
@@ -669,8 +652,8 @@ async def revision_loop_phase(
         await ctx.narrate(
             run.run_name,
             phase="revision",
-            just_completed="finished deterministic CAD validation",
-            next_step="send it to review" if validation.ok else "stop with diagnosable failure",
+            just_completed="finished deterministic CAD pipeline",
+            next_step="send it to review",
             why="",
             signals={
                 "attempt": attempt,
@@ -686,28 +669,6 @@ async def revision_loop_phase(
             },
             fallback=fallback_revision_built(cad_out),
         )
-
-        if not validation.ok:
-            ctx.emit(
-                run.run_name,
-                ProgressEventKind.breadcrumb,
-                message="CAD validation exhausted debug loops; not persisting",
-                data={
-                    "attempt": attempt,
-                    "debug_artifact_path": validation.debug_dir,
-                    "build_errors": cad_out.build_errors[:3],
-                },
-            )
-            break
-
-        build_dir = Path(runtime.run_ctx.notes["last_build"]["output_dir"])
-        render_dir = Path(runtime.run_ctx.notes["last_render"]["output_dir"])
-        staging = _staging_views_dir(runtime.run_root, attempt)
-        staged_views = _stage_views(render_dir, staging)
-
-        build_meta = Path(runtime.run_ctx.notes["last_build"]["metadata_path"])
-        render_meta = Path(runtime.run_ctx.notes["last_render"]["metadata_path"])
-        inspect_src = Path(validation.debug_dir) / "inspect-summary.json"
 
         if (
             not staged_views
