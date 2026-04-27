@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import json
 import importlib.util
+import os
+import stat
 import threading
 from pathlib import Path
+
+import pytest
 
 
 def _load_atomic_write_text():
@@ -74,3 +78,38 @@ def test_atomic_write_text_threaded_stress_writes_valid_json(tmp_path: Path) -> 
     final_payload = json.loads(target.read_text(encoding="utf-8"))
     assert final_payload["message"] == "atomic-write"
     assert len(final_payload["padding"]) == 4096
+
+
+def test_atomic_write_text_keeps_existing_file_mode(tmp_path: Path) -> None:
+    target = tmp_path / "snapshot.json"
+    target.write_text("{}", encoding="utf-8")
+    target.chmod(0o640)
+
+    atomic_write_text(target, '{"ok": true}')
+
+    mode = stat.S_IMODE(target.stat().st_mode)
+    assert mode == 0o640
+
+
+def test_atomic_write_text_directory_fsync_is_best_effort(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "run.json"
+    open_calls = 0
+    original_open = os.open
+
+    def failing_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes], flags: int, *args: int
+    ) -> int:
+        nonlocal open_calls
+        if Path(path) == target.parent and flags == os.O_RDONLY:
+            open_calls += 1
+            raise PermissionError("no read permission for directory")
+        return original_open(path, flags, *args)
+
+    monkeypatch.setattr(os, "open", failing_open)
+
+    atomic_write_text(target, '{"status": "ok"}')
+
+    assert target.read_text(encoding="utf-8") == '{"status": "ok"}'
+    assert open_calls == 1
