@@ -338,11 +338,17 @@ class RunDriver:
         designer_agent = build_cad_designer(profile, run_ctx)
         start = time.monotonic()
         logger.info(
-            "agent start: cad_designer timeout=%ss max_turns=6",
+            "agent start: cad_designer timeout=%ss max_turns=%d",
             self.config.timeouts.agent_run,
+            self.config.max_cad_designer_turns,
         )
         result = await asyncio.wait_for(
-            Runner.run(designer_agent, input=designer_input, context=run_ctx, max_turns=6),
+            Runner.run(
+                designer_agent,
+                input=designer_input,
+                context=run_ctx,
+                max_turns=self.config.max_cad_designer_turns,
+            ),
             timeout=self.config.timeouts.agent_run,
         )
         logger.info("agent end: cad_designer elapsed=%.2fs", time.monotonic() - start)

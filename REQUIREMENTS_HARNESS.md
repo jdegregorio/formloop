@@ -48,7 +48,7 @@
 | FLH-NF-006 | The harness shall emit progress information in a polling-friendly format consisting of structured events and materialized snapshots rather than relying on a streaming-only contract. | The v1 UI and tooling model is polling-based. | Implemented |
 | FLH-NF-007 | The harness shall expose enough structured logs, traces, and stored outputs to debug failures in normal runs and eval runs. | Diagnosability is required for development and operator trust. | Implemented |
 | FLH-NF-008 | The harness should keep configuration and context surfaces intentionally small so the system stays maintainable. | The simplification effort is explicitly trying to reduce over-specification and accidental complexity. | Implemented |
-| FLH-NF-009 | The harness shall note and avoid wasteful repeated model or render work when behavior changes would materially increase cost. | Cost discipline is part of the operating model. | Partial — revision loop is bounded by `max_revisions` and short-circuits on pass; research fan-out is bounded by `max_research_topics` (caps model-call count), and each research run is bounded by `max_research_turns` (caps tool-using search depth per topic); smoke uses `dev_test` profile. No per-token metering yet. |
+| FLH-NF-009 | The harness shall note and avoid wasteful repeated model or render work when behavior changes would materially increase cost. | Cost discipline is part of the operating model. | Partial — revision loop is bounded by `max_revisions` and short-circuits on pass; research fan-out is bounded by `max_research_topics` (caps model-call count), each research run is bounded by `max_research_turns` (caps tool-using search depth per topic), and CAD Designer source authoring is bounded by `max_cad_designer_turns` so self-check/tool use has room without becoming unbounded; smoke uses `dev_test` profile. No per-token metering yet. |
 | FLH-NF-010 | Narration generation shall not block the orchestrator on failure: a Narrator timeout or exception shall degrade to a static fallback message, surface a `narration_error` field on the resulting event, and never abort the run. | Narration is a presentation feature, not a correctness feature; flakiness in the narrator must not cost the user a real CAD output. | Implemented |
 
 ### Design and technical constraint requirements
@@ -104,6 +104,7 @@ The harness configuration baseline is intentionally small:
 - Local development secrets may be loaded from a repo-root `.env.local` file into environment variables at process start, and `.env.local` shall remain untracked.
 - `.gitignore` and `.env.example` are the canonical tracked references for secret posture and should stay aligned with the requirements.
 - The minimum environment variable contract is `OPENAI_API_KEY`.
+- CAD Designer source authoring is bounded by `max_cad_designer_turns` so tool-using self-check workflows have an explicit cost and latency cap.
 
 The initial profile defaults are:
 

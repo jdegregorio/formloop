@@ -43,7 +43,11 @@ class CliError(RuntimeError):
             if output and output.strip().startswith("{"):
                 try:
                     payload = json.loads(output)
-                    if isinstance(payload, dict) and "error" in payload and isinstance(payload["error"], dict):
+                    if (
+                        isinstance(payload, dict)
+                        and "error" in payload
+                        and isinstance(payload["error"], dict)
+                    ):
                         err = payload["error"]
                         self.cli_error_type = err.get("type")
                         self.cli_error_message = err.get("message")

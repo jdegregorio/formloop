@@ -14,7 +14,7 @@ import inspect
 import pydoc
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
@@ -549,7 +549,8 @@ def python_help(target: str) -> str:
         except Exception as exc:  # noqa: BLE001
             return f"Could not locate or import {target!r}: {type(exc).__name__}: {exc}"
     try:
-        return pydoc.render_doc(obj, renderer=pydoc.plaintext)[:12_000]
+        renderer = cast(Any, pydoc.plaintext)  # type: ignore[attr-defined]
+        return pydoc.render_doc(obj, renderer=renderer)[:12_000]
     except Exception as exc:  # noqa: BLE001
         return f"Could not render docs for {target!r}: {type(exc).__name__}: {exc}"
 
@@ -560,20 +561,21 @@ def python_inspect(target: str) -> str:
     obj = pydoc.locate(target)
     if obj is None:
         return f"Could not locate {target!r}"
+    target_obj = cast(Any, obj)
     parts = [f"Target: {target}", f"Type: {type(obj)}"]
     try:
-        parts.append(f"Signature: {inspect.signature(obj)}")
+        parts.append(f"Signature: {inspect.signature(target_obj)}")
     except Exception:  # noqa: BLE001
         parts.append("Signature: <unavailable>")
     try:
-        parts.append(f"File: {inspect.getfile(obj)}")
+        parts.append(f"File: {inspect.getfile(target_obj)}")
     except Exception:  # noqa: BLE001
         pass
     doc = inspect.getdoc(obj)
     if doc:
         parts.append("\nDocstring:\n" + doc[:4000])
     try:
-        parts.append("\nSource:\n" + inspect.getsource(obj)[:6000])
+        parts.append("\nSource:\n" + inspect.getsource(target_obj)[:6000])
     except Exception:  # noqa: BLE001
         pass
     return "\n".join(parts)
