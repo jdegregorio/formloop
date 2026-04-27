@@ -31,6 +31,16 @@ logger = logging.getLogger(__name__)
 MAX_SOURCE_DEBUG_LOOPS = 3
 MAX_SOURCE_ATTEMPTS = 1 + MAX_SOURCE_DEBUG_LOOPS
 SNIPPET_CHARS = 4000
+REQUIRED_RENDER_ARTIFACTS = (
+    "sheet.png",
+    "front.png",
+    "back.png",
+    "left.png",
+    "right.png",
+    "top.png",
+    "bottom.png",
+    "iso.png",
+)
 
 
 class CadCommandEvidence(BaseModel):
@@ -101,6 +111,10 @@ def _write_json(path: Path, payload: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
     return path
+
+
+def _missing_render_artifacts(render_out: Path) -> list[str]:
+    return [name for name in REQUIRED_RENDER_ARTIFACTS if not (render_out / name).is_file()]
 
 
 def _clip(text: str | None) -> str:
@@ -567,6 +581,7 @@ async def revision_loop_phase(
             _write_json(inspect_src, inspect.model_dump())
             validation.inspect_ok = True
             validation.inspect_result = inspect.model_dump()
+            runtime.run_ctx.notes["last_inspect"] = validation.inspect_result
         except Exception as exc:  # noqa: BLE001
             ctx.emit(
                 run.run_name,
@@ -582,9 +597,8 @@ async def revision_loop_phase(
                 output_dir=render_dir,
                 timeout=runtime.run_ctx.timeouts.cad_render,
             )
-            validation.render_ok = True
             validation.render_result = render.model_dump()
-            _write_json(Path(validation.debug_dir) / "render-result.json", render.model_dump())
+            _write_json(Path(validation.debug_dir) / "render-result.json", validation.render_result)
         except Exception as exc:  # noqa: BLE001
             ctx.emit(
                 run.run_name,
@@ -593,6 +607,21 @@ async def revision_loop_phase(
                 data={"attempt": attempt, "debug_artifact_path": validation.debug_dir},
             )
             break
+
+        missing_render_artifacts = _missing_render_artifacts(render_dir)
+        if missing_render_artifacts:
+            ctx.emit(
+                run.run_name,
+                ProgressEventKind.cad_validation_failed,
+                message="final render missing required artifacts",
+                data={
+                    "attempt": attempt,
+                    "debug_artifact_path": validation.debug_dir,
+                    "missing_render_artifacts": missing_render_artifacts,
+                },
+            )
+            break
+        validation.render_ok = True
 
         staging = _staging_views_dir(runtime.run_root, attempt)
         staged_views = _stage_views(render_dir, staging)
