@@ -12,7 +12,7 @@ from ..schemas import ArtifactEntry, ArtifactManifest, Revision, Run
 from .candidate_bundle import CandidateBundle
 from .io import atomic_write_text
 from .layout import RevisionLayout, RunLayout
-from .naming import next_revision_name
+from .naming import reserve_next_revision_name_dir
 
 
 class RevisionStore:
@@ -21,9 +21,10 @@ class RevisionStore:
     def persist(
         self, run: Run, layout: RunLayout, bundle: CandidateBundle
     ) -> tuple[Revision, RevisionLayout]:
-        name = next_revision_name(layout.revisions_dir)
+        name = reserve_next_revision_name_dir(layout.revisions_dir)
         ordinal = len(run.revisions) + 1
         rev_layout = layout.revision(name)
+        # Directory reservation above is atomic; keep this mkdir idempotent.
         rev_layout.root.mkdir(parents=True, exist_ok=True)
         rev_layout.views_dir.mkdir(parents=True, exist_ok=True)
 

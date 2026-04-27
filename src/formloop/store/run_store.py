@@ -22,7 +22,7 @@ from .candidate_bundle import CandidateBundle
 from .event_log import EventLog
 from .io import atomic_write_text
 from .layout import RunLayout
-from .naming import next_run_name
+from .naming import reserve_next_run_name_dir
 from .revision_store import RevisionStore
 from .snapshot_projector import SnapshotProjector
 
@@ -51,7 +51,7 @@ class RunStore:
         effective_runtime: EffectiveRuntime,
         reference_image: str | None = None,
     ) -> tuple[Run, RunLayout]:
-        name = next_run_name(self.runs_root)
+        name = reserve_next_run_name_dir(self.runs_root)
         layout = RunLayout(runs_root=self.runs_root, run_name=name)
         layout.ensure()
 
