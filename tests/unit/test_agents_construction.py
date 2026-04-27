@@ -12,10 +12,8 @@ from formloop.agents import (
     CadSourceResult,
     ManagerFinalAnswer,
     ManagerPlan,
-    ResearchFinding,
     RunContext,
     build_cad_designer,
-    build_design_researcher,
     build_judge,
     build_manager_final,
     build_manager_plan,
@@ -48,13 +46,6 @@ def test_manager_planner_structured_output(profile: Profile) -> None:
 def test_manager_final_structured_output(profile: Profile) -> None:
     agent = build_manager_final(profile)
     assert _underlying_type(agent) is ManagerFinalAnswer
-
-
-def test_design_researcher_has_web_search(profile: Profile) -> None:
-    agent = build_design_researcher(profile)
-    assert _underlying_type(agent) is ResearchFinding
-    tool_names = [t.__class__.__name__ for t in agent.tools]
-    assert "WebSearchTool" in tool_names
 
 
 def test_cad_designer_is_source_only(profile: Profile, tmp_path) -> None:

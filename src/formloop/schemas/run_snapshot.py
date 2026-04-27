@@ -32,6 +32,7 @@ class RunSnapshot(SchemaModel):
     current_revision_name: str | None = None
     revisions: list[str] = Field(default_factory=list)
     research_findings: list[dict[str, Any]] = Field(default_factory=list)
+    effective_role_runtimes: dict[str, dict[str, str]] = Field(default_factory=dict)
 
     latest_review_decision: ReviewDecision | None = None
     latest_review_summary_path: str | None = None

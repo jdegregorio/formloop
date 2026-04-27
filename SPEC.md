@@ -34,13 +34,15 @@ Formloop should not duplicate deterministic geometry logic that belongs in `cad-
 
 Formloop shall use the OpenAI Agents SDK as its orchestration framework.
 
-The v1 harness architecture is manager plus specialists exposed as bounded tools:
+The v1 harness architecture is manager plus a small set of specialists and
+harness-managed direct model calls:
 
 - **Manager**
 - **CAD Designer**
-- **Design Researcher**
 - **Reviewer**
 - **Judge**
+- **Narrator**
+- **Direct research call** (not an agent)
 
 The manager owns the user-facing objective and the final answer. Specialists do not take over the run. They are exposed to the manager as callable capabilities through `agent.as_tool()` or the equivalent SDK pattern so the manager keeps control of orchestration and output.
 
@@ -69,10 +71,12 @@ The application code owns deterministic workflow decisions such as:
 Agents handle the adaptive parts inside that workflow:
 
 - interpreting design intent
-- researching standards or conventions
-- authoring CAD source and repair responses from harness validation feedback
+- authoring CAD source
 - reviewing candidate outputs
 - synthesizing findings into user-facing updates
+
+Harness-managed direct OpenAI Responses calls handle focused research topics
+with built-in `web_search`. They are not agent run loops.
 
 This keeps the core run and revision loop controlled by the harness while still using agents for the fuzzy reasoning steps.
 
@@ -81,16 +85,20 @@ This keeps the core run and revision loop controlled by the harness while still 
 The specialist roles are intentionally small:
 
 - **CAD Designer** owns CAD source authoring. The harness owns artifact-oriented
-  `cad-cli` build, inspect, render, validation retry feedback, and revision execution.
-- **Design Researcher** owns external factual research and uses OpenAI search-enabled requests when web research is needed.
+  final `cad-cli` build, inspect, render, and revision execution.
 - **Reviewer** owns normal design-loop review against the current spec, artifacts, and optional reference image.
 - **Judge** owns developer-eval judgment against ground-truth data plus deterministic metrics.
+- **Narrator** owns low-cost progress narration from sanitized milestone payloads.
+
+Design research is deliberately not a specialist agent in the current harness.
+The manager may identify research topics, then the harness fans those topics out
+as one direct search-enabled Responses request per topic.
 
 #### Parallel Research
 
 Independent research topics may be executed concurrently when the harness can prove the branches are independent. This concurrency should be orchestrated by the application, such as with `asyncio.gather`, rather than delegated to planner-style model behavior.
 
-The manager may identify required research topics without personally performing every delegation step. The harness may translate those identified topics into concurrent research tasks and return the results to the manager for synthesis.
+The manager may identify required research topics without personally performing every delegation step. The harness may translate those identified topics into concurrent direct research calls and return the results to the manager for synthesis. Each topic is bounded to one built-in web-search tool call so research remains predictable and inspectable.
 
 #### Run Context vs Prompt Context
 

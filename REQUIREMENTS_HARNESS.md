@@ -10,7 +10,7 @@
 | -- | ----------- | --------- | ------ |
 | FLH-F-001 | The harness shall maintain a normalized current fit/form/function specification for the active design. | The normalized spec is the shared object that connects user intent, agent work, review, and delivery. | Implemented |
 | FLH-F-002 | The harness shall provide a manager agent that coordinates the active run and owns the final user-facing answer. | The architecture is manager-led rather than peer-to-peer. | Implemented |
-| FLH-F-003 | The harness shall provide at minimum the specialist roles CAD Designer, Design Researcher, Reviewer (design-loop quality review), and Judge (developer-eval quality judgment). | v1 should keep the specialist set intentionally small while preserving a clean boundary between runtime review and eval judgment behavior. | Implemented |
+| FLH-F-003 | The harness shall provide at minimum the specialist roles CAD Designer, Reviewer (design-loop quality review), Judge (developer-eval quality judgment), and Narrator, plus harness-managed direct research calls. | v1 should keep the specialist set intentionally small while preserving a clean boundary between runtime review, eval judgment behavior, narration, and research. | Implemented |
 | FLH-F-004 | The manager shall invoke specialists as bounded tool-like capabilities using the OpenAI Agents SDK `agent.as_tool()` pattern or an equivalent SDK mechanism. | The chosen architecture is hub-and-spoke with the manager retaining control. | Implemented |
 | FLH-F-005 | The harness shall support an internal review loop for normal design runs where no ground-truth geometry is available. | Normal user runs still require closed-loop validation. | Implemented |
 | FLH-F-006 | The harness shall keep normal design-review and developer-eval judgment as distinct specialist agents (`reviewer` and `judge`) with intentionally different prompt contracts and outputs. | The two review contexts have different goals and should stay separated to reduce coupling and instruction bleed-over. | Implemented |
@@ -23,7 +23,7 @@
 | FLH-F-013 | The operator CLI shall support `formloop ui start`, `formloop ui stop`, `formloop ui status`, `formloop run`, `formloop eval run`, `formloop eval report`, `formloop doctor`, and `formloop update`. | These are the agreed primary operator surfaces. | Implemented |
 | FLH-F-014 | The harness shall support developer eval runs over datasets with known ground-truth geometry. | Developer evals are a first-class system capability. | Implemented |
 | FLH-F-015 | The harness shall combine deterministic eval metrics with structured LLM judge outputs. | Both deterministic evidence and higher-level assessment are required. | Implemented |
-| FLH-F-016 | The Design Researcher shall be able to perform internet research through OpenAI search-enabled requests. | Standards, conventions, and part facts may require external research. | Implemented |
+| FLH-F-016 | The harness shall perform internet research through direct OpenAI Responses calls with built-in web search rather than a Design Researcher agent. | Standards, conventions, and part facts may require external research, but a full agent loop adds unnecessary orchestration and tool-use cost. | Implemented |
 | FLH-F-017 | The manager shall be able to identify required research topics without being required to execute each research task directly. | The harness may orchestrate research fan-out on the manager's behalf. | Implemented |
 | FLH-F-018 | The harness shall support application-orchestrated concurrent research execution for independent research branches. | Independent research work should be parallelizable without surrendering control to planner-style tool use. | Implemented |
 | FLH-F-019 | The harness shall always attempt to produce at least one delivered revision through the run-and-review loop. | The product should bias toward a real design attempt rather than a question-first dead end. | Implemented |
@@ -48,7 +48,7 @@
 | FLH-NF-006 | The harness shall emit progress information in a polling-friendly format consisting of structured events and materialized snapshots rather than relying on a streaming-only contract. | The v1 UI and tooling model is polling-based. | Implemented |
 | FLH-NF-007 | The harness shall expose enough structured logs, traces, and stored outputs to debug failures in normal runs and eval runs. | Diagnosability is required for development and operator trust. | Implemented |
 | FLH-NF-008 | The harness should keep configuration and context surfaces intentionally small so the system stays maintainable. | The simplification effort is explicitly trying to reduce over-specification and accidental complexity. | Implemented |
-| FLH-NF-009 | The harness shall note and avoid wasteful repeated model or render work when behavior changes would materially increase cost. | Cost discipline is part of the operating model. | Partial — revision loop is bounded by `max_revisions` and short-circuits on pass; research fan-out is bounded by `max_research_topics` (caps model-call count), each research run is bounded by `max_research_turns` (caps tool-using search depth per topic), and CAD Designer source authoring is bounded by `max_cad_designer_turns` so self-check/tool use has room without becoming unbounded; smoke uses `dev_test` profile. No per-token metering yet. |
+| FLH-NF-009 | The harness shall note and avoid wasteful repeated model or render work when behavior changes would materially increase cost. | Cost discipline is part of the operating model. | Partial — revision loop is bounded by `max_revisions` and short-circuits on pass; research fan-out is bounded by `max_research_topics` and each topic is one Responses request with `max_tool_calls=1`; CAD Designer source authoring is bounded by `max_cad_designer_turns=20`; the harness now performs one final authoritative `cad build` per source instead of retrying source authoring inside the build-debug loop; CAD Designer tool traces record per-tool counts and arguments. No per-token metering yet. |
 | FLH-NF-010 | Narration generation shall not block the orchestrator on failure: a Narrator timeout or exception shall degrade to a static fallback message, surface a `narration_error` field on the resulting event, and never abort the run. | Narration is a presentation feature, not a correctness feature; flakiness in the narrator must not cost the user a real CAD output. | Implemented |
 
 ### Design and technical constraint requirements
@@ -64,8 +64,8 @@
 | FLH-D-007 | The harness shall use the OpenAI Agents SDK as its required agent orchestration framework. | OpenAI Agents SDK is the chosen implementation path. | Implemented |
 | FLH-D-008 | OpenAI-backed runs shall use the OpenAI Responses path by default. | This is the preferred OpenAI execution path for v1. | Implemented |
 | FLH-D-009 | The harness shall optimize for OpenAI-only execution in v1 and shall not require a multi-provider abstraction. | The simplification effort intentionally removes multi-provider scope. | Implemented |
-| FLH-D-010 | Each agent shall be defined in its own Python module with detailed instructions, explicit tool access, an explicit model choice, and structured output where useful. | Specialist behavior should be explicit and versionable in code. | Implemented |
-| FLH-D-011 | The harness shall keep deterministic orchestration in application code while using agents for adaptive inner steps such as interpretation, research, CAD authoring, and review. | This formalizes the harness-first architecture. | Implemented |
+| FLH-D-010 | Each agent shall be defined in its own Python module with detailed instructions, explicit tool access, an explicit model choice, and structured output where useful; direct research helpers shall be versioned explicitly outside the agent set. | Specialist behavior should be explicit and versionable in code while avoiding unnecessary agents. | Implemented |
+| FLH-D-011 | The harness shall keep deterministic orchestration in application code while using agents for adaptive inner steps such as interpretation, CAD authoring, and review, and direct Responses calls for bounded research. | This formalizes the harness-first architecture. | Implemented |
 | FLH-D-012 | Parallel specialist work shall be orchestrated by application code and used only when branch independence is clear. | Parallelism should be deliberate and safe. | Implemented |
 | FLH-D-013 | The harness shall keep run context separate from prompt context so internal identifiers, handles, caches, and other application state can remain outside model-visible input unless needed. | This is an important architectural boundary for correctness and safety. | Implemented |
 | FLH-D-014 | The harness shall maintain a checked-in non-secret configuration file for runtime defaults at the repo root as `formloop.harness.toml`. | Runtime defaults should be explicit, shareable, and inspectable. | Implemented |
@@ -101,10 +101,17 @@ The harness configuration baseline is intentionally small:
 - The checked-in non-secret configuration file shall live at the repo root as `formloop.harness.toml`.
 - The initial named profiles are `normal` and `dev_test`.
 - Developer evals should use `normal`.
+- Each profile may define role-level model/reasoning overrides for `manager_plan`, `research`, `cad_designer`, `reviewer`, `manager_final`, `judge`, and `narrator`.
+- Effective role runtime precedence is per-role CLI/API override, then global CLI/API `model`/`effort` override, then profile role override, then the profile base model/reasoning.
+- `formloop run` and `formloop eval run` support repeatable `--role-model ROLE=MODEL` and `--role-effort ROLE=EFFORT` flags, and the HTTP create-run request accepts matching optional role override maps.
+- Effective role runtimes are persisted on run state and snapshots for traceability.
 - Local development secrets may be loaded from a repo-root `.env.local` file into environment variables at process start, and `.env.local` shall remain untracked.
 - `.gitignore` and `.env.example` are the canonical tracked references for secret posture and should stay aligned with the requirements.
 - The minimum environment variable contract is `OPENAI_API_KEY`.
-- CAD Designer source authoring is bounded by `max_cad_designer_turns` so tool-using self-check workflows have an explicit cost and latency cap.
+- Research is bounded by `max_research_topics`; each research topic is one direct Responses call with built-in web search and `max_tool_calls=1`.
+- CAD Designer source authoring is bounded by `max_cad_designer_turns` so tool-using self-check workflows have an explicit cost and latency cap. The checked-in default is `20`.
+- Each CAD Designer run writes a durable tool-call trace JSON under the run work area and emits a compact `agent_tool_summary` progress event pointing to that trace.
+- The harness performs one final authoritative `cad build` after CAD Designer source authoring. If that build fails, failure evidence is persisted and no revision is created. `cad inspect` and `cad render` run only after the final build succeeds.
 
 The initial profile defaults are:
 
@@ -122,6 +129,7 @@ The stable run-state contract shall include at minimum:
 - effective profile
 - effective model
 - effective reasoning level
+- effective role runtimes
 - current spec
 - recorded assumptions
 - current status summary

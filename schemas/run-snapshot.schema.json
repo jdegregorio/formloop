@@ -90,6 +90,16 @@
       "title": "Current Spec",
       "type": "object"
     },
+    "effective_role_runtimes": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Effective Role Runtimes",
+      "type": "object"
+    },
     "generated_at": {
       "title": "Generated At",
       "type": "string"

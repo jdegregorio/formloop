@@ -65,12 +65,24 @@ class OrchestrationPhaseContext(Protocol):
 
 
 class PhaseRuntimeContext:
-    def __init__(self, *, run, run_ctx: RunContext, profile: Profile, user_prompt: str) -> None:
+    def __init__(
+        self,
+        *,
+        run,
+        run_ctx: RunContext,
+        profile: Profile,
+        user_prompt: str,
+        role_profiles: dict[str, Profile] | None = None,
+    ) -> None:
         self.run = run
         self.run_ctx = run_ctx
         self.profile = profile
         self.user_prompt = user_prompt
+        self.role_profiles = role_profiles or {}
 
     @property
     def run_root(self) -> Path:
         return self.run_ctx.run_root
+
+    def profile_for(self, role: str) -> Profile:
+        return self.role_profiles.get(role, self.profile)

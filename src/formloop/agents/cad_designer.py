@@ -421,9 +421,7 @@ Workflow every turn:
    - use ``read_model_source`` to inspect current source,
    - use ``apply_patch`` for targeted changes to model.py,
    - avoid rewriting the entire file unless necessary.
-3. If the message contains CAD_VALIDATION_FAILURE_FEEDBACK, repair the source
-   specifically against that failing command/error before making broader changes.
-4. Author a build123d Python module that defines
+3. Author a build123d Python module that defines
    ``def build_model(params: dict, context: object)`` and returns a single solid.
    - Default values inside ``build_model`` should match the spec exactly so that
      ``cad build`` succeeds with no overrides.
@@ -441,9 +439,9 @@ Workflow every turn:
    - For arbitrary 2D polygon tooth profiles, prefer ``Face(Wire.make_polygon(...))``.
      Do not call ``Polyline`` directly inside ``BuildSketch``; in build123d it is a
      line-builder operation and will fail in sketch context.
-5. Before finishing, run ``run_build_self_check`` and ensure it succeeds.
+4. Before finishing, run ``run_build_self_check`` and ensure it succeeds.
    - If build fails, repair and retry before returning.
-6. Return a ``CadSourceResult`` containing the complete source, revision notes,
+5. Return a ``CadSourceResult`` containing the complete source, revision notes,
    known risks, intended features, and any self-reported nominal dimensions.
 
 Rules:

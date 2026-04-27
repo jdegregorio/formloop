@@ -18,6 +18,7 @@
         "revision_persisted",
         "review_started",
         "review_completed",
+        "agent_tool_summary",
         "breadcrumb",
         "narration",
         "delivered",

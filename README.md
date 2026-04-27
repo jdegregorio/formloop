@@ -2,9 +2,10 @@
 
 Formloop is the agent harness that turns natural-language design intent into
 managed CAD work. It orchestrates a manager agent and a small set of
-specialists (CAD Designer, Design Researcher, Quality Specialist) around the
-deterministic `cad-cli` toolchain, producing inspectable STEP / GLB / render
-artifacts plus structured review output.
+specialists (CAD Designer, Reviewer, Judge, Narrator), plus direct
+search-enabled research calls, around the deterministic `cad-cli` toolchain,
+producing inspectable STEP / GLB / render artifacts plus structured review
+output.
 
 See `REQUIREMENTS_HARNESS.md` for the authoritative requirements, `SPEC.md`
 for architecture context, and `AGENTS.md` for coding-agent working rules.

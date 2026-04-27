@@ -9,10 +9,9 @@ max_revisions = 3
 
 # Research fan-out discipline (FLH-F-018, FLH-NF-009).
 max_research_topics = 8
-max_research_turns = 3
 
 # CAD Designer tool-use turn discipline (FLH-NF-009).
-max_cad_designer_turns = 12
+max_cad_designer_turns = 20
 
 # Path (relative to repo root) where generated run artifacts live (FLH-D-023).
 runs_dir = "var/runs"
