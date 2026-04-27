@@ -316,7 +316,9 @@ class RunDriver:
         researcher_input = (
             f"Topic: {topic}\n\n"
             f"Turn budget: {self.config.max_research_turns} total turns.\n"
-            "Plan tool use so you can finish within budget. Leave one turn for the final answer.\n"
+            "Plan tool use so you can finish within budget. "
+            "If budget is 2+ turns, reserve one turn for the final answer; "
+            "if budget is 1 turn, answer directly without tool use.\n"
             "Final answer limit: 500 words maximum."
         )
         result = await asyncio.wait_for(
