@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import stat
 import tempfile
 from pathlib import Path
 
@@ -13,6 +14,15 @@ def atomic_write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path: Path | None = None
     replaced = False
+
+    desired_mode: int | None = None
+    try:
+        desired_mode = stat.S_IMODE(path.stat().st_mode)
+    except FileNotFoundError:
+        # For new targets, keep the temp file's existing mode so the process
+        # umask is respected without mutating global process state.
+        pass
+
     try:
         with tempfile.NamedTemporaryFile(
             mode="w",
@@ -26,17 +36,24 @@ def atomic_write_text(path: Path, text: str) -> None:
             tmp.flush()
             os.fsync(tmp.fileno())
 
+        if desired_mode is not None:
+            os.chmod(temp_path, desired_mode)
+
         os.replace(temp_path, path)
         replaced = True
 
         if os.name == "posix":
-            dir_fd = os.open(path.parent, os.O_RDONLY)
             try:
-                os.fsync(dir_fd)
+                dir_fd = os.open(path.parent, os.O_RDONLY)
             except OSError:
                 pass
-            finally:
-                os.close(dir_fd)
+            else:
+                try:
+                    os.fsync(dir_fd)
+                except OSError:
+                    pass
+                finally:
+                    os.close(dir_fd)
     except Exception:
         if temp_path is not None and not replaced:
             try:
