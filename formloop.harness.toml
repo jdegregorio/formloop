@@ -7,6 +7,10 @@ default_profile = "normal"
 # Revision loop discipline (FLH-NF-009).
 max_revisions = 3
 
+# Research fan-out discipline (FLH-F-018, FLH-NF-009).
+max_research_topics = 8
+max_research_turns = 3
+
 # Path (relative to repo root) where generated run artifacts live (FLH-D-023).
 runs_dir = "var/runs"
 evals_dir = "var/evals"
