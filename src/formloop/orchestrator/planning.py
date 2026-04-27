@@ -17,7 +17,12 @@ async def plan_phase(
 ):
     run = runtime.run
     logger.info("plan phase: start")
-    plan = await ctx.plan(runtime.user_prompt, runtime.profile)
+    profile = (
+        runtime.profile_for("manager_plan")
+        if hasattr(runtime, "profile_for")
+        else runtime.profile
+    )
+    plan = await ctx.plan(runtime.user_prompt, profile)
     fresh = ctx.load_run(run.run_name)
     fresh.current_spec = plan.normalized_spec.model_dump()
     fresh.assumptions = [

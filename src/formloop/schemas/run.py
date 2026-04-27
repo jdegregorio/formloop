@@ -29,12 +29,20 @@ class AssumptionRecord(SchemaModel):
     recorded_at: str = Field(default_factory=utcnow_iso)
 
 
+class RoleRuntime(SchemaModel):
+    """Effective model settings for one harness role."""
+
+    model: str
+    reasoning: str
+
+
 class EffectiveRuntime(SchemaModel):
     """Effective runtime metadata used for this run (FLH-D-017)."""
 
     profile: str
     model: str
     reasoning: str
+    roles: dict[str, RoleRuntime] = Field(default_factory=dict)
 
 
 class AgentAnswer(SchemaModel):

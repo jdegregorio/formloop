@@ -28,6 +28,10 @@ class SnapshotProjector:
             current_revision_name=run.current_revision_id,
             revisions=list(run.revisions),
             research_findings=run.research_findings,
+            effective_role_runtimes={
+                role: {"model": runtime.model, "reasoning": runtime.reasoning}
+                for role, runtime in run.effective_runtime.roles.items()
+            },
         )
         if run.current_revision_id:
             rev_layout = layout.revision(run.current_revision_id)

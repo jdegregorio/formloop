@@ -36,6 +36,8 @@ async def run_eval_batch(
     effort: str | None = None,
     batch_name: str | None = None,
     max_revisions: int | None = None,
+    role_model_overrides: dict[str, str] | None = None,
+    role_reasoning_overrides: dict[str, str] | None = None,
 ) -> Path:
     cases = load_cases(dataset_path)
     batch_name = batch_name or datetime.utcnow().strftime("batch-%Y%m%d-%H%M%S")
@@ -44,7 +46,15 @@ async def run_eval_batch(
     (config.evals_dir / "latest.txt").write_text(batch_name)
 
     batch_summary: list[dict] = []
-    eval_profile = config.profile(profile or "normal")
+    base_eval_profile = config.profile(profile or "normal")
+    role_profiles = config.resolve_role_profiles(
+        base_eval_profile,
+        global_model=model,
+        global_reasoning=effort,
+        role_model_overrides=role_model_overrides,
+        role_reasoning_overrides=role_reasoning_overrides,
+    )
+    eval_profile = role_profiles["judge"]
 
     for case in cases:
         case_dir = batch_dir / case.case_id
@@ -70,6 +80,8 @@ async def run_eval_batch(
                 reasoning_override=effort,
                 reference_image=str(case.reference_image) if case.reference_image else None,
                 max_revisions=max_revisions,
+                role_model_overrides=role_model_overrides,
+                role_reasoning_overrides=role_reasoning_overrides,
             )
         )
         (case_dir / "drive-result.json").write_text(json.dumps(result, indent=2))

@@ -17,6 +17,7 @@ from .run import (
     AgentAnswer,
     AssumptionRecord,
     EffectiveRuntime,
+    RoleRuntime,
     Run,
     RunStatus,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "ReviewSummary",
     "Revision",
     "RevisionTrigger",
+    "RoleRuntime",
     "Run",
     "RunCreateRequest",
     "RunCreateResponse",

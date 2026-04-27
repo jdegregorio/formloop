@@ -30,6 +30,7 @@ class ProgressEventKind(str, Enum):
     revision_persisted = "revision_persisted"
     review_started = "review_started"
     review_completed = "review_completed"
+    agent_tool_summary = "agent_tool_summary"
     breadcrumb = "breadcrumb"
     narration = "narration"
     delivered = "delivered"

@@ -4,6 +4,19 @@
   "additionalProperties": false,
   "description": "Minimum payload to start a run.",
   "properties": {
+    "effort": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional global reasoning override.",
+      "title": "Effort"
+    },
     "max_revisions": {
       "anyOf": [
         {
@@ -17,6 +30,19 @@
       "default": null,
       "description": "Override the config default.",
       "title": "Max Revisions"
+    },
+    "model": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional global model override.",
+      "title": "Model"
     },
     "profile": {
       "default": "normal",
@@ -41,6 +67,22 @@
       "default": null,
       "description": "Optional path (server-side) to a reference image.",
       "title": "Reference Image"
+    },
+    "role_models": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Optional per-role model overrides, keyed by runtime role.",
+      "title": "Role Models",
+      "type": "object"
+    },
+    "role_reasoning": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Optional per-role reasoning overrides, keyed by runtime role.",
+      "title": "Role Reasoning",
+      "type": "object"
     },
     "schema_version": {
       "default": 1,

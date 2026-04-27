@@ -60,7 +60,7 @@ async def review_phase(
             payload=payload,
             image_paths=image_paths,
         ),
-        runtime.profile,
+        runtime.profile_for("reviewer"),
     )
     fresh = ctx.load_run(run.run_name)
     ctx.attach_review(fresh, revision.revision_name, review)

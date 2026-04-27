@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -60,7 +59,6 @@ def _stub_config(tmp_path: Path) -> HarnessConfig:
         default_profile="dev_test",
         max_revisions=1,
         max_research_topics=8,
-        max_research_turns=3,
         runs_dir=tmp_path / "runs",
         evals_dir=tmp_path / "evals",
         timeouts=Timeouts(
@@ -78,8 +76,8 @@ def _install_runner_stub(monkeypatch) -> None:
     """Replace ``Runner.run`` with a deterministic dispatcher.
 
     Returns canned outputs for the manager, the cad designer (source only),
-    the reviewer, and the manager-final agent. Researcher isn't called because
-    the plan has no research topics.
+    the reviewer, and the manager-final agent. Direct research is not called
+    because the plan has no research topics.
     """
 
     def fake_cad_build(*, model_path: Path, output_dir: Path, **kwargs):  # noqa: ARG001
@@ -376,38 +374,35 @@ async def test_run_driver_reports_failed_when_revisions_persisted_without_pass(
     assert persisted.status_detail == "2 revision(s) persisted but none passed review"
 
 
-async def test_research_topic_uses_configured_max_turns(tmp_path, monkeypatch) -> None:
+async def test_research_topic_uses_direct_responses_helper(tmp_path, monkeypatch) -> None:
     config = _stub_config(tmp_path)
-    config = replace(config, max_research_turns=3)
     driver = RunDriver(config, narrator=Narrator(fallback_only=True))
 
     captured: dict[str, Any] = {}
 
-    async def fake_run(agent, input, *args, **kwargs):  # noqa: A002
-        captured["agent_name"] = getattr(agent, "name", "")
-        captured["input"] = input
-        captured["max_turns"] = kwargs.get("max_turns")
-        return _FakeResult(
-            final_output=SimpleNamespace(
-                model_dump=lambda: {"topic": "topic-123", "summary": "ok", "citations": []}
-            )
-        )
+    async def fake_research(topic, profile, *, timeout, client=None):  # noqa: ARG001
+        captured["topic"] = topic
+        captured["model"] = profile.model
+        captured["reasoning"] = profile.reasoning
+        captured["timeout"] = timeout
+        return {"topic": topic, "summary": "ok", "citations": []}
 
-    monkeypatch.setattr("formloop.orchestrator.run_driver.Runner.run", fake_run)
+    monkeypatch.setattr("formloop.orchestrator.run_driver.research_topic_direct", fake_research)
     finding = await driver.research_topic("topic-123", config.profile("dev_test"))
 
-    assert captured["agent_name"] == "design_researcher"
-    assert captured["max_turns"] == 3
-    assert "Topic: topic-123" in captured["input"]
-    assert "Turn budget: 3 total turns." in captured["input"]
-    assert "Final answer limit: 500 words maximum." in captured["input"]
+    assert captured == {
+        "topic": "topic-123",
+        "model": "stub",
+        "reasoning": "low",
+        "timeout": 60,
+    }
     assert finding["topic"] == "topic-123"
 
 
 async def test_cad_designer_uses_configured_max_turns(tmp_path, monkeypatch) -> None:
     config = replace(_stub_config(tmp_path), max_cad_designer_turns=12)
     driver = RunDriver(config, narrator=Narrator(fallback_only=True))
-    _, run_ctx, profile, _ = driver.create_shell(DriveRequest(prompt="a 20mm cube"))
+    _, run_ctx, profile, _, _ = driver.create_shell(DriveRequest(prompt="a 20mm cube"))
 
     captured: dict[str, Any] = {}
 
@@ -438,3 +433,29 @@ async def test_cad_designer_uses_configured_max_turns(tmp_path, monkeypatch) -> 
         "has_context": True,
     }
     assert result.source
+    events = driver.store.read_events(run_ctx.run_name)
+    summary = [event for event in events if event.kind == ProgressEventKind.agent_tool_summary]
+    assert summary
+    assert summary[-1].data["trace_path"].endswith("cad_designer-r000-s001.json")
+
+
+async def test_create_shell_persists_effective_role_runtimes(tmp_path) -> None:
+    config = _stub_config(tmp_path)
+    driver = RunDriver(config, narrator=Narrator(fallback_only=True))
+
+    run, _, _, role_profiles, _ = driver.create_shell(
+        DriveRequest(
+            prompt="a 20mm cube",
+            model_override="global-model",
+            reasoning_override="medium",
+            role_model_overrides={"cad_designer": "cad-model"},
+            role_reasoning_overrides={"reviewer": "high"},
+        )
+    )
+
+    persisted = driver.store.load_run(run.run_name)
+    snapshot = driver.store.load_snapshot(run.run_name)
+    assert role_profiles["cad_designer"].model == "cad-model"
+    assert persisted.effective_runtime.roles["cad_designer"].model == "cad-model"
+    assert persisted.effective_runtime.roles["reviewer"].reasoning == "high"
+    assert snapshot.effective_role_runtimes["cad_designer"]["model"] == "cad-model"

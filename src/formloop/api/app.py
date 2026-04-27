@@ -45,16 +45,21 @@ def create_app(config: HarnessConfig | None = None) -> FastAPI:
         request = DriveRequest(
             prompt=body.prompt,
             profile_name=body.profile,
+            model_override=body.model,
+            reasoning_override=body.effort,
             reference_image=body.reference_image,
             max_revisions=body.max_revisions,
+            role_model_overrides=body.role_models,
+            role_reasoning_overrides=body.role_reasoning,
         )
-        run, run_ctx, profile, max_revisions = driver.create_shell(request)
+        run, run_ctx, profile, role_profiles, max_revisions = driver.create_shell(request)
 
         task = asyncio.create_task(
             driver.continue_run(
                 run=run,
                 run_ctx=run_ctx,
                 profile=profile,
+                role_profiles=role_profiles,
                 max_revisions=max_revisions,
                 user_prompt=body.prompt,
             )

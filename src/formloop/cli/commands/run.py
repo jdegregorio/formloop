@@ -12,6 +12,7 @@ import typer
 from ...config.env import require_openai_key
 from ...config.profiles import HarnessConfig
 from ...orchestrator import drive_run
+from ..role_overrides import parse_role_assignments
 from ..run_renderer import make_renderer
 from ..run_report import print_run_footer, print_run_header
 
@@ -40,6 +41,20 @@ def register(app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -> N
             int | None,
             typer.Option("--max-revisions", help="Override max revision attempts."),
         ] = None,
+        role_model: Annotated[
+            list[str] | None,
+            typer.Option(
+                "--role-model",
+                help="Per-role model override as ROLE=MODEL. Repeatable.",
+            ),
+        ] = None,
+        role_effort: Annotated[
+            list[str] | None,
+            typer.Option(
+                "--role-effort",
+                help="Per-role reasoning override as ROLE=EFFORT. Repeatable.",
+            ),
+        ] = None,
         quiet: Annotated[
             bool,
             typer.Option(
@@ -66,6 +81,12 @@ def register(app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -> N
         config: HarnessConfig = resolve_config()
         ref = str(reference_image.resolve()) if reference_image else None
         resolved_profile = config.profile(profile)
+        try:
+            role_model_overrides = parse_role_assignments(role_model)
+            role_reasoning_overrides = parse_role_assignments(role_effort, validate_values=True)
+        except ValueError as exc:
+            typer.echo(f"formloop run failed: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
 
         renderer = make_renderer(quiet=quiet, verbose=verbose, color=not no_color)
 
@@ -94,6 +115,8 @@ def register(app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -> N
                     effort=effort,
                     reference_image=ref,
                     max_revisions=max_revisions,
+                    role_model_overrides=role_model_overrides,
+                    role_reasoning_overrides=role_reasoning_overrides,
                     event_hook=renderer,
                 )
             )

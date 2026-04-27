@@ -27,7 +27,10 @@ async def research_phase(
         message=f"researching {len(plan.research_topics)} topics",
         data={"topics": list(plan.research_topics)},
     )
-    tasks = [ctx.research_topic(topic, runtime.profile) for topic in plan.research_topics]
+    profile = (
+        runtime.profile_for("research") if hasattr(runtime, "profile_for") else runtime.profile
+    )
+    tasks = [ctx.research_topic(topic, profile) for topic in plan.research_topics]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     findings: list[dict] = []
     failures = 0

@@ -5,6 +5,7 @@ Uses a stub driver + fixture config so the tests don't require OpenAI.
 
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
 import httpx
@@ -36,7 +37,6 @@ def _stub_config(tmp_path: Path) -> HarnessConfig:
         default_profile="dev_test",
         max_revisions=1,
         max_research_topics=8,
-        max_research_turns=3,
         runs_dir=tmp_path / "runs",
         evals_dir=tmp_path / "evals",
         timeouts=Timeouts(
@@ -158,3 +158,41 @@ async def test_snapshot_and_events_and_artifacts(tmp_path: Path) -> None:
         # unknown run
         r = await client.get("/runs/run-9999/snapshot")
         assert r.status_code == 404
+
+
+async def test_create_run_accepts_role_overrides_and_exposes_effective_runtimes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _stub_config(tmp_path)
+
+    async def fake_continue_run(self, **kwargs):  # noqa: ANN001, ARG001
+        return {"status": "succeeded"}
+
+    api_app = importlib.import_module("formloop.api.app")
+    monkeypatch.setattr(api_app.RunDriver, "continue_run", fake_continue_run)
+    app = create_app(config)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.post(
+            "/runs",
+            json={
+                "prompt": "a 20mm cube",
+                "profile": "dev_test",
+                "model": "global-api",
+                "effort": "low",
+                "role_models": {"cad_designer": "cad-api"},
+                "role_reasoning": {"reviewer": "medium"},
+            },
+        )
+        assert r.status_code == 201
+        run_name = r.json()["run_name"]
+        await app.state.background[run_name]
+
+        run = app.state.store.load_run(run_name)
+        assert run.effective_runtime.model == "global-api"
+        assert run.effective_runtime.reasoning == "low"
+        snap = (await client.get(f"/runs/{run_name}/snapshot")).json()
+        assert snap["effective_role_runtimes"]["cad_designer"]["model"] == "cad-api"
+        assert snap["effective_role_runtimes"]["manager_plan"]["model"] == "global-api"
+        assert snap["effective_role_runtimes"]["reviewer"]["reasoning"] == "medium"

@@ -21,7 +21,6 @@ from agents import (  # noqa: F401 -- re-exported for the rest of the package
     ModelSettings,
     RunContextWrapper,
     Runner,
-    WebSearchTool,
     apply_diff,
     function_tool,
 )
@@ -110,7 +109,6 @@ __all__ = [
     "RunContext",
     "RunContextWrapper",
     "Runner",
-    "WebSearchTool",
     "apply_diff",
     "build_model_settings",
     "function_tool",

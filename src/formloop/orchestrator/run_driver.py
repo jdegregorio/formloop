@@ -9,7 +9,6 @@ REQ: FLH-D-025
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import json
 import logging
 import time
@@ -22,22 +21,30 @@ from ..agents import (
     RunContext,
     Runner,
     build_cad_designer,
-    build_design_researcher,
     build_manager_final,
     build_manager_plan,
     build_reviewer,
 )
 from ..agents.manager import ManagerFinalAnswer
-from ..config.profiles import HarnessConfig, Profile
+from ..config.profiles import HarnessConfig, Profile, validate_reasoning
 from ..logging_util import setup_run_logger, teardown_run_logger
-from ..schemas import AgentAnswer, EffectiveRuntime, ProgressEvent, ProgressEventKind, RunStatus
+from ..schemas import (
+    AgentAnswer,
+    EffectiveRuntime,
+    ProgressEvent,
+    ProgressEventKind,
+    RoleRuntime,
+    RunStatus,
+)
 from ..store import RunStore
+from .direct_research import research_topic_direct
 from .narration import sanitize_context
 from .narrator import Narrator
 from .phase_context import PhaseRuntimeContext
 from .planning import plan_phase
 from .research import research_phase
 from .revision_loop import revision_loop_phase
+from .tool_trace import AgentToolTraceRecorder, write_tool_trace
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +57,8 @@ class DriveRequest:
     reasoning_override: str | None = None
     reference_image: str | None = None
     max_revisions: int | None = None
+    role_model_overrides: dict[str, str] | None = None
+    role_reasoning_overrides: dict[str, str] | None = None
 
 
 class RunDriver:
@@ -66,21 +75,34 @@ class RunDriver:
         self.config = config
         self.store = store or RunStore(config.runs_dir)
         self._event_hook = event_hook
-        self.narrator = narrator if narrator is not None else Narrator.auto()
+        self.narrator = narrator
 
     def create_shell(self, request: DriveRequest):
         profile = self.config.profile(request.profile_name)
-        if request.model_override or request.reasoning_override:
-            profile = dataclasses.replace(
-                profile,
-                model=request.model_override or profile.model,
-                reasoning=cast(Any, request.reasoning_override or profile.reasoning),
-            )
+        role_profiles = self.config.resolve_role_profiles(
+            profile,
+            global_model=request.model_override,
+            global_reasoning=request.reasoning_override,
+            role_model_overrides=request.role_model_overrides,
+            role_reasoning_overrides=request.role_reasoning_overrides,
+        )
+        effective_model = request.model_override or profile.model
+        effective_reasoning = (
+            validate_reasoning(request.reasoning_override, label="global reasoning override")
+            if request.reasoning_override
+            else profile.reasoning
+        )
         max_revisions = request.max_revisions or self.config.max_revisions
         run, layout = self.store.create_run(
             input_summary=request.prompt,
             effective_runtime=EffectiveRuntime(
-                profile=profile.name, model=profile.model, reasoning=profile.reasoning
+                profile=profile.name,
+                model=effective_model,
+                reasoning=effective_reasoning,
+                roles={
+                    role: RoleRuntime(model=role_profile.model, reasoning=role_profile.reasoning)
+                    for role, role_profile in role_profiles.items()
+                },
             ),
             reference_image=request.reference_image,
         )
@@ -92,28 +114,48 @@ class RunDriver:
             run_name=run.run_name,
             run_root=layout.root,
             source_dir=source_dir,
-            profile=profile,
+            profile=Profile(
+                name=profile.name,
+                model=effective_model,
+                reasoning=effective_reasoning,
+                description=profile.description,
+                role_overrides=profile.role_overrides,
+            ),
             timeouts=self.config.timeouts,
         )
-        return run, run_ctx, profile, max_revisions
+        return run, run_ctx, run_ctx.profile, role_profiles, max_revisions
 
     async def run(self, request: DriveRequest) -> dict[str, Any]:
-        run, run_ctx, profile, max_revisions = self.create_shell(request)
+        run, run_ctx, profile, role_profiles, max_revisions = self.create_shell(request)
         return await self.continue_run(
             run=run,
             run_ctx=run_ctx,
             profile=profile,
+            role_profiles=role_profiles,
             max_revisions=max_revisions,
             user_prompt=request.prompt,
         )
 
     async def continue_run(
-        self, *, run, run_ctx: RunContext, profile: Profile, max_revisions: int, user_prompt: str
+        self,
+        *,
+        run,
+        run_ctx: RunContext,
+        profile: Profile,
+        role_profiles: dict[str, Profile],
+        max_revisions: int,
+        user_prompt: str,
     ) -> dict[str, Any]:
         delivered_rev_name: str | None = None
         runtime = PhaseRuntimeContext(
-            run=run, run_ctx=run_ctx, profile=profile, user_prompt=user_prompt
+            run=run,
+            run_ctx=run_ctx,
+            profile=profile,
+            role_profiles=role_profiles,
+            user_prompt=user_prompt,
         )
+        if self.narrator is None:
+            self.narrator = Narrator.auto(profile=runtime.profile_for("narrator"))
         log_handler = setup_run_logger(self.store.layout(run.run_name).log_path)
         start = time.monotonic()
         logger.info(
@@ -144,7 +186,9 @@ class RunDriver:
                     findings=findings,
                     max_revisions=max_revisions,
                 )
-                final = await self._finalize(run, plan, delivered_rev_name, profile)
+                final = await self._finalize(
+                    run, plan, delivered_rev_name, runtime.profile_for("manager_final")
+                )
                 run = self.store.load_run(run.run_name)
                 run.final_answer = AgentAnswer(
                     text=final.text, delivered_revision_name=delivered_rev_name
@@ -260,7 +304,8 @@ class RunDriver:
             context=sanitize_context(context or {}),
         )
         try:
-            text, err = await self.narrator.narrate(payload, fallback=fallback)
+            narrator = self.narrator or Narrator.auto()
+            text, err = await narrator.narrate(payload, fallback=fallback)
         except Exception as exc:  # noqa: BLE001
             text, err = fallback, f"{type(exc).__name__}: {exc}"[:200]
         self.emit(
@@ -305,54 +350,91 @@ class RunDriver:
         return result.final_output
 
     async def research_topic(self, topic: str, profile: Profile) -> dict[str, Any]:
-        researcher = build_design_researcher(profile)
         start = time.monotonic()
         logger.info(
-            "agent start: design_researcher timeout=%ss max_turns=%d topic=%r",
+            "direct research start: timeout=%ss topic=%r model=%s reasoning=%s",
             self.config.timeouts.agent_run,
-            self.config.max_research_turns,
             topic[:160],
+            profile.model,
+            profile.reasoning,
         )
-        researcher_input = (
-            f"Topic: {topic}\n\n"
-            f"Turn budget: {self.config.max_research_turns} total turns.\n"
-            "Plan tool use so you can finish within budget. Leave one turn for the final answer.\n"
-            "Final answer limit: 500 words maximum."
-        )
-        result = await asyncio.wait_for(
-            Runner.run(
-                researcher,
-                input=researcher_input,
-                max_turns=self.config.max_research_turns,
-            ),
+        finding = await research_topic_direct(
+            topic,
+            profile,
             timeout=self.config.timeouts.agent_run,
         )
         logger.info(
-            "agent end: design_researcher elapsed=%.2fs topic=%r",
+            "direct research end: elapsed=%.2fs topic=%r",
             time.monotonic() - start,
             topic[:160],
         )
-        return result.final_output.model_dump()
+        return finding
 
     async def design_revision(self, designer_input: str, run_ctx: RunContext, profile: Profile):
         designer_agent = build_cad_designer(profile, run_ctx)
         start = time.monotonic()
+        recorder = AgentToolTraceRecorder(
+            agent_name="cad_designer",
+            model=profile.model,
+            reasoning=profile.reasoning,
+            max_turns=self.config.max_cad_designer_turns,
+        )
         logger.info(
             "agent start: cad_designer timeout=%ss max_turns=%d",
             self.config.timeouts.agent_run,
             self.config.max_cad_designer_turns,
         )
-        result = await asyncio.wait_for(
-            Runner.run(
-                designer_agent,
-                input=designer_input,
-                context=run_ctx,
-                max_turns=self.config.max_cad_designer_turns,
-            ),
-            timeout=self.config.timeouts.agent_run,
+        revision_attempt = int(run_ctx.notes.get("revision_attempt", 0) or 0)
+        source_attempt = int(run_ctx.notes.get("source_attempt", 1) or 1)
+        trace_path = (
+            run_ctx.run_root
+            / "_work"
+            / "tool_traces"
+            / f"cad_designer-r{revision_attempt:03d}-s{source_attempt:03d}.json"
         )
+        try:
+            result = await asyncio.wait_for(
+                Runner.run(
+                    designer_agent,
+                    input=designer_input,
+                    context=run_ctx,
+                    max_turns=self.config.max_cad_designer_turns,
+                    hooks=recorder,
+                ),
+                timeout=self.config.timeouts.agent_run,
+            )
+        except Exception as exc:
+            trace = recorder.trace_from_error(exc)
+            write_tool_trace(trace_path, trace)
+            self._emit_cad_tool_summary(run_ctx, trace_path, trace)
+            logger.info("agent error: cad_designer elapsed=%.2fs", time.monotonic() - start)
+            raise
+        trace = recorder.trace_from_result(result)
+        write_tool_trace(trace_path, trace)
+        self._emit_cad_tool_summary(run_ctx, trace_path, trace)
         logger.info("agent end: cad_designer elapsed=%.2fs", time.monotonic() - start)
         return result.final_output
+
+    def _emit_cad_tool_summary(
+        self, run_ctx: RunContext, trace_path, trace: dict[str, Any]
+    ) -> None:
+        summary_message = (
+            "cad_designer tool calls: "
+            + ", ".join(f"{name}={count}" for name, count in trace["counts"].items())
+            if trace["counts"]
+            else "cad_designer tool calls: 0"
+        )
+        self.emit(
+            run_ctx.run_name,
+            ProgressEventKind.agent_tool_summary,
+            message=summary_message,
+            data={
+                "agent": "cad_designer",
+                "total_tool_calls": trace["total_tool_calls"],
+                "counts": trace["counts"],
+                "trace_path": str(trace_path),
+            },
+        )
 
     async def review_revision(self, payload: list[dict[str, Any]], profile: Profile):
         reviewer = build_reviewer(profile)
@@ -392,6 +474,8 @@ async def drive_run(
     effort: str | None = None,
     reference_image: str | None = None,
     max_revisions: int | None = None,
+    role_model_overrides: dict[str, str] | None = None,
+    role_reasoning_overrides: dict[str, str] | None = None,
     event_hook: Callable[[ProgressEvent], None] | None = None,
     narrator: Narrator | None = None,
 ) -> dict[str, Any]:
@@ -404,5 +488,7 @@ async def drive_run(
             reasoning_override=effort,
             reference_image=reference_image,
             max_revisions=max_revisions,
+            role_model_overrides=role_model_overrides,
+            role_reasoning_overrides=role_reasoning_overrides,
         )
     )

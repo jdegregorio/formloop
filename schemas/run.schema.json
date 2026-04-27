@@ -79,6 +79,13 @@
           "title": "Reasoning",
           "type": "string"
         },
+        "roles": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RoleRuntime"
+          },
+          "title": "Roles",
+          "type": "object"
+        },
         "schema_version": {
           "default": 1,
           "minimum": 1,
@@ -92,6 +99,32 @@
         "reasoning"
       ],
       "title": "EffectiveRuntime",
+      "type": "object"
+    },
+    "RoleRuntime": {
+      "additionalProperties": false,
+      "description": "Effective model settings for one harness role.",
+      "properties": {
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "reasoning": {
+          "title": "Reasoning",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "reasoning"
+      ],
+      "title": "RoleRuntime",
       "type": "object"
     },
     "RunStatus": {

@@ -28,8 +28,6 @@ from .review import review_phase
 
 logger = logging.getLogger(__name__)
 
-MAX_SOURCE_DEBUG_LOOPS = 3
-MAX_SOURCE_ATTEMPTS = 1 + MAX_SOURCE_DEBUG_LOOPS
 SNIPPET_CHARS = 4000
 REQUIRED_RENDER_ARTIFACTS = (
     "sheet.png",
@@ -144,7 +142,6 @@ def _format_designer_input(
     runtime: PhaseRuntimeContext,
     findings: list[dict],
     prior_review: dict | None,
-    failure_feedback: CadFailureFeedback | None,
 ) -> str:
     prompt_ctx = PromptContext(
         input_summary=runtime.user_prompt,
@@ -162,14 +159,6 @@ def _format_designer_input(
             "final cad-cli artifact generation; the harness will build, inspect, and render."
         ),
     ]
-    if failure_feedback is not None:
-        parts.append(
-            "CAD_VALIDATION_FAILURE_FEEDBACK (JSON):\n" + failure_feedback.model_dump_json(indent=2)
-        )
-        parts.append(
-            "Repair the source to address this exact failed command. Preserve "
-            "spec intent unless the failure shows the implementation strategy is invalid."
-        )
     return "\n\n".join(parts)
 
 
@@ -221,8 +210,11 @@ def _command_failure(
         elapsed_s=round(elapsed_s, 3),
         debug_artifact_path=str(attempt_dir),
         repair_instructions=[
-            "Return a corrected complete model.py source in CadSourceResult.source.",
-            "Do not call cad-cli yourself; the harness will rerun validation.",
+            "Inspect this evidence before the next revision attempt.",
+            (
+                "Return a corrected complete model.py source if the reviewer asks "
+                "for another revision."
+            ),
             "Use the failed command stderr/stdout to make the smallest source fix.",
         ],
     )
@@ -250,7 +242,7 @@ def _artifact_failure(
         detail=message,
         debug_artifact_path=str(attempt_dir),
         repair_instructions=[
-            "Return a corrected complete model.py source in CadSourceResult.source.",
+            "Inspect this evidence before the next revision attempt.",
             "The command returned successfully but did not produce the required artifact bundle.",
         ],
     )
@@ -424,88 +416,83 @@ async def _author_and_validate_source(
     prior_review: dict | None,
     revision_attempt: int,
 ) -> tuple[CadSourceResult | None, CadValidationResult]:
-    failure_feedback: CadFailureFeedback | None = None
-    last_source_result: CadSourceResult | None = None
-    last_validation: CadValidationResult | None = None
-
-    for source_attempt in range(1, MAX_SOURCE_ATTEMPTS + 1):
-        designer_input = _format_designer_input(
-            plan=plan,
-            runtime=runtime,
-            findings=findings,
-            prior_review=prior_review,
-            failure_feedback=failure_feedback,
-        )
-        source_result = await ctx.design_revision(designer_input, runtime.run_ctx, runtime.profile)
-        last_source_result = source_result
+    source_attempt = 1
+    runtime.run_ctx.notes["source_attempt"] = source_attempt
+    designer_input = _format_designer_input(
+        plan=plan,
+        runtime=runtime,
+        findings=findings,
+        prior_review=prior_review,
+    )
+    source_result = await ctx.design_revision(
+        designer_input,
+        runtime.run_ctx,
+        runtime.profile_for("cad_designer"),
+    )
+    ctx.emit(
+        runtime.run.run_name,
+        ProgressEventKind.cad_source_authored,
+        message="CAD source authored",
+        data={
+            "revision_attempt": revision_attempt,
+            "source_attempt": source_attempt,
+            "bytes": len(source_result.source.encode("utf-8")),
+            "known_risks": list(source_result.known_risks)[:3],
+        },
+    )
+    ctx.emit(
+        runtime.run.run_name,
+        ProgressEventKind.cad_validation_started,
+        message="validating CAD source",
+        data={
+            "revision_attempt": revision_attempt,
+            "source_attempt": source_attempt,
+            "commands": ["cad build"],
+        },
+    )
+    validation = _validate_cad_source(
+        runtime,
+        revision_attempt=revision_attempt,
+        source_attempt=source_attempt,
+        source_result=source_result,
+    )
+    if validation.ok:
         ctx.emit(
             runtime.run.run_name,
-            ProgressEventKind.cad_source_authored,
-            message=f"CAD source authored ({source_attempt}/{MAX_SOURCE_ATTEMPTS})",
-            data={
-                "revision_attempt": revision_attempt,
-                "source_attempt": source_attempt,
-                "bytes": len(source_result.source.encode("utf-8")),
-                "known_risks": list(source_result.known_risks)[:3],
-            },
-        )
-        ctx.emit(
-            runtime.run.run_name,
-            ProgressEventKind.cad_validation_started,
-            message=f"validating CAD source ({source_attempt}/{MAX_SOURCE_ATTEMPTS})",
-            data={
-                "revision_attempt": revision_attempt,
-                "source_attempt": source_attempt,
-                "commands": ["cad build"],
-            },
-        )
-        validation = _validate_cad_source(
-            runtime,
-            revision_attempt=revision_attempt,
-            source_attempt=source_attempt,
-            source_result=source_result,
-        )
-        last_validation = validation
-        if validation.ok:
-            ctx.emit(
-                runtime.run.run_name,
-                ProgressEventKind.cad_validation_completed,
-                message="CAD validation completed",
-                data={
-                    "revision_attempt": revision_attempt,
-                    "source_attempt": source_attempt,
-                    "debug_artifact_path": validation.debug_dir,
-                    "command_count": len(validation.commands),
-                },
-            )
-            return source_result, validation
-
-        failure_feedback = validation.failure_feedback
-        ctx.emit(
-            runtime.run.run_name,
-            ProgressEventKind.cad_validation_failed,
-            message=failure_feedback.summary if failure_feedback else "CAD validation failed",
+            ProgressEventKind.cad_validation_completed,
+            message="CAD validation completed",
             data={
                 "revision_attempt": revision_attempt,
                 "source_attempt": source_attempt,
                 "debug_artifact_path": validation.debug_dir,
-                "failed_phase": failure_feedback.failed_phase if failure_feedback else None,
-                "failed_command": failure_feedback.failed_command if failure_feedback else None,
-                "returncode": failure_feedback.returncode if failure_feedback else None,
+                "command_count": len(validation.commands),
             },
         )
-        logger.warning(
-            "cad validation failed: revision_attempt=%d source_attempt=%d "
-            "phase=%s command=%s dir=%s",
-            revision_attempt,
-            source_attempt,
-            failure_feedback.failed_phase if failure_feedback else "?",
-            failure_feedback.failed_command if failure_feedback else "?",
-            validation.debug_dir,
-        )
+        return source_result, validation
 
-    assert last_validation is not None
-    return last_source_result, last_validation
+    failure_feedback = validation.failure_feedback
+    ctx.emit(
+        runtime.run.run_name,
+        ProgressEventKind.cad_validation_failed,
+        message=failure_feedback.summary if failure_feedback else "CAD validation failed",
+        data={
+            "revision_attempt": revision_attempt,
+            "source_attempt": source_attempt,
+            "debug_artifact_path": validation.debug_dir,
+            "failed_phase": failure_feedback.failed_phase if failure_feedback else None,
+            "failed_command": failure_feedback.failed_command if failure_feedback else None,
+            "returncode": failure_feedback.returncode if failure_feedback else None,
+        },
+    )
+    logger.warning(
+        "cad validation failed: revision_attempt=%d source_attempt=%d phase=%s command=%s dir=%s",
+        revision_attempt,
+        source_attempt,
+        failure_feedback.failed_phase if failure_feedback else "?",
+        failure_feedback.failed_command if failure_feedback else "?",
+        validation.debug_dir,
+    )
+    return source_result, validation
 
 
 async def revision_loop_phase(
@@ -559,7 +546,7 @@ async def revision_loop_phase(
             ctx.emit(
                 run.run_name,
                 ProgressEventKind.breadcrumb,
-                message="CAD validation exhausted debug loops; not persisting",
+                message="CAD validation failed; not persisting",
                 data={
                     "attempt": attempt,
                     "debug_artifact_path": validation.debug_dir,
