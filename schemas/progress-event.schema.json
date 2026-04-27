@@ -5,6 +5,7 @@
         "run_created",
         "spec_normalized",
         "assumption_recorded",
+        "research_topics_truncated",
         "research_started",
         "research_completed",
         "revision_started",

@@ -47,7 +47,10 @@ Rules:
 - If the topic includes an "available libraries" list, constrain implementation
   guidance to that list and avoid suggesting unavailable packages.
 - Always call the web_search tool at least once before responding unless the
-  question is purely definitional."""
+  question is purely definitional.
+- Respect any explicit turn budget included in the prompt. Assume each tool call
+  consumes a turn. Keep at least one turn for the final answer.
+- Keep the final response under 500 words."""
 
 
 def build_design_researcher(profile: Profile) -> Agent[None]:

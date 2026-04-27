@@ -15,8 +15,9 @@ The driver must:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -52,6 +53,8 @@ def _stub_config(tmp_path: Path) -> HarnessConfig:
     return HarnessConfig(
         default_profile="dev_test",
         max_revisions=1,
+        max_research_topics=8,
+        max_research_turns=3,
         runs_dir=tmp_path / "runs",
         evals_dir=tmp_path / "evals",
         timeouts=Timeouts(
@@ -222,7 +225,7 @@ async def test_run_driver_coordinates_phase_functions(tmp_path, monkeypatch) -> 
 
     calls: list[str] = []
 
-    async def fake_plan(ctx, runtime):
+    async def fake_plan(ctx, runtime, *, max_research_topics):  # noqa: ARG001
         assert ctx is driver
         calls.append("plan")
         return ManagerPlan(
@@ -243,7 +246,7 @@ async def test_run_driver_coordinates_phase_functions(tmp_path, monkeypatch) -> 
             design_brief="brief",
         )
 
-    async def fake_research(ctx, runtime, *, plan):
+    async def fake_research(ctx, runtime, *, plan):  # noqa: ARG001
         assert ctx is driver
         calls.append("research")
         return []
@@ -276,7 +279,7 @@ async def test_run_driver_reports_failed_when_revisions_persisted_without_pass(
     config = _stub_config(tmp_path)
     driver = RunDriver(config, narrator=Narrator(fallback_only=True))
 
-    async def fake_plan(ctx, runtime):
+    async def fake_plan(ctx, runtime, *, max_research_topics):  # noqa: ARG001
         return ManagerPlan(
             normalized_spec=NormalizedSpec(
                 name="cube",
@@ -295,7 +298,7 @@ async def test_run_driver_reports_failed_when_revisions_persisted_without_pass(
             design_brief="brief",
         )
 
-    async def fake_research(ctx, runtime, *, plan):
+    async def fake_research(ctx, runtime, *, plan):  # noqa: ARG001
         return []
 
     async def fake_revision(ctx, runtime, *, plan, findings, max_revisions):
@@ -316,3 +319,31 @@ async def test_run_driver_reports_failed_when_revisions_persisted_without_pass(
     persisted = driver.store.load_run(result["run_name"])
     assert persisted.status.value == "failed"
     assert persisted.status_detail == "2 revision(s) persisted but none passed review"
+
+
+async def test_research_topic_uses_configured_max_turns(tmp_path, monkeypatch) -> None:
+    config = _stub_config(tmp_path)
+    config = replace(config, max_research_turns=3)
+    driver = RunDriver(config, narrator=Narrator(fallback_only=True))
+
+    captured: dict[str, Any] = {}
+
+    async def fake_run(agent, input, *args, **kwargs):  # noqa: A002
+        captured["agent_name"] = getattr(agent, "name", "")
+        captured["input"] = input
+        captured["max_turns"] = kwargs.get("max_turns")
+        return _FakeResult(
+            final_output=SimpleNamespace(
+                model_dump=lambda: {"topic": "topic-123", "summary": "ok", "citations": []}
+            )
+        )
+
+    monkeypatch.setattr("formloop.orchestrator.run_driver.Runner.run", fake_run)
+    finding = await driver.research_topic("topic-123", config.profile("dev_test"))
+
+    assert captured["agent_name"] == "design_researcher"
+    assert captured["max_turns"] == 3
+    assert "Topic: topic-123" in captured["input"]
+    assert "Turn budget: 3 total turns." in captured["input"]
+    assert "Final answer limit: 500 words maximum." in captured["input"]
+    assert finding["topic"] == "topic-123"
