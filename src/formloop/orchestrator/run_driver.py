@@ -127,8 +127,16 @@ class RunDriver:
         )
         try:
             try:
-                plan = await plan_phase(self, runtime)
-                findings = await research_phase(self, runtime, plan=plan)
+                plan = await plan_phase(
+                    self,
+                    runtime,
+                    max_research_topics=self.config.max_research_topics,
+                )
+                findings = await research_phase(
+                    self,
+                    runtime,
+                    plan=plan,
+                )
                 delivered_rev_name = await revision_loop_phase(
                     self,
                     runtime,
@@ -300,12 +308,13 @@ class RunDriver:
         researcher = build_design_researcher(profile)
         start = time.monotonic()
         logger.info(
-            "agent start: design_researcher timeout=%ss topic=%r",
+            "agent start: design_researcher timeout=%ss max_turns=%d topic=%r",
             self.config.timeouts.agent_run,
+            self.config.max_research_turns,
             topic[:160],
         )
         result = await asyncio.wait_for(
-            Runner.run(researcher, input=topic),
+            Runner.run(researcher, input=topic, max_turns=self.config.max_research_turns),
             timeout=self.config.timeouts.agent_run,
         )
         logger.info(

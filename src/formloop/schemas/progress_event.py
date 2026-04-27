@@ -17,6 +17,7 @@ class ProgressEventKind(str, Enum):
     run_created = "run_created"
     spec_normalized = "spec_normalized"
     assumption_recorded = "assumption_recorded"
+    research_topics_truncated = "research_topics_truncated"
     research_started = "research_started"
     research_completed = "research_completed"
     revision_started = "revision_started"

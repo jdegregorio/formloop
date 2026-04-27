@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 async def plan_phase(
     ctx: OrchestrationPhaseContext,
     runtime: PhaseRuntimeContext,
+    *,
+    max_research_topics: int,
 ):
     run = runtime.run
     logger.info("plan phase: start")
@@ -22,6 +24,27 @@ async def plan_phase(
         AssumptionRecord(topic=a.topic, assumption=a.assumption) for a in plan.assumptions
     ]
     ctx.save_run(fresh)
+    original_topic_count = len(plan.research_topics)
+    if original_topic_count > max_research_topics:
+        plan.research_topics = list(plan.research_topics[:max_research_topics])
+        dropped = original_topic_count - len(plan.research_topics)
+        logger.info(
+            "plan phase: truncated research topics requested=%d kept=%d dropped=%d",
+            original_topic_count,
+            len(plan.research_topics),
+            dropped,
+        )
+        ctx.emit(
+            run.run_name,
+            ProgressEventKind.research_topics_truncated,
+            message="research topics truncated",
+            data={
+                "requested_count": original_topic_count,
+                "kept_count": len(plan.research_topics),
+                "dropped_count": dropped,
+            },
+        )
+
     spec_kind = plan.normalized_spec.type
     logger.info(
         "plan phase: complete kind=%s assumptions=%d topics=%d",
