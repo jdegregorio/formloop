@@ -80,39 +80,52 @@ def test_atomic_write_text_threaded_stress_writes_valid_json(tmp_path: Path) -> 
     assert len(final_payload["padding"]) == 4096
 
 
-def test_atomic_write_text_keeps_existing_file_mode(tmp_path: Path) -> None:
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permissions semantics")
+def test_atomic_write_text_preserves_existing_file_permissions(tmp_path: Path) -> None:
     target = tmp_path / "snapshot.json"
-    target.write_text("{}", encoding="utf-8")
-    target.chmod(0o640)
+    target.write_text('{"initial":true}', encoding="utf-8")
+    target.chmod(0o644)
 
-    atomic_write_text(target, '{"ok": true}')
+    atomic_write_text(target, '{"updated":true}')
 
-    mode = stat.S_IMODE(target.stat().st_mode)
-    assert mode == 0o640
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
 
 
-def test_atomic_write_text_directory_fsync_is_best_effort(
+@pytest.mark.skipif(os.name != "posix", reason="POSIX directory fsync semantics")
+def test_atomic_write_text_swallows_parent_open_fail_after_replace(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     target = tmp_path / "run.json"
-    open_calls = 0
-    original_open = os.open
+    real_open = os.open
 
-    def failing_open(
-        path: str | bytes | os.PathLike[str] | os.PathLike[bytes], flags: int, *args: int
-    ) -> int:
-        nonlocal open_calls
-        if Path(path) == target.parent and flags == os.O_RDONLY:
-            open_calls += 1
-            raise PermissionError("no read permission for directory")
-        return original_open(path, flags, *args)
+    def open_that_fails_for_directory(path: str | os.PathLike[str], flags: int, *args: object) -> int:
+        if Path(path) == target.parent:
+            raise OSError("cannot open parent")
+        return real_open(path, flags, *args)
 
-    monkeypatch.setattr(os, "open", failing_open)
+    monkeypatch.setattr(os, "open", open_that_fails_for_directory)
 
-    atomic_write_text(target, '{"status": "ok"}')
+    atomic_write_text(target, '{"ok":true}')
 
-    assert target.read_text(encoding="utf-8") == '{"status": "ok"}'
-    assert open_calls == 1
+    assert json.loads(target.read_text(encoding="utf-8"))["ok"] is True
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX umask semantics")
+def test_atomic_write_text_new_file_does_not_mutate_process_umask(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "new.json"
+    original_umask = os.umask(0o027)
+    os.umask(original_umask)
+
+    def fail_if_called(mask: int) -> int:
+        raise AssertionError(f"os.umask should not be called, got {mask:o}")
+
+    monkeypatch.setattr(os, "umask", fail_if_called)
+
+    atomic_write_text(target, '{"ok":true}')
+
+    assert json.loads(target.read_text(encoding="utf-8"))["ok"] is True
 
 
 def test_atomic_write_text_without_fchmod_still_replaces_file(

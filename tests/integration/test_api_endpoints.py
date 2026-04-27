@@ -35,6 +35,8 @@ def _stub_config(tmp_path: Path) -> HarnessConfig:
     return HarnessConfig(
         default_profile="dev_test",
         max_revisions=1,
+        max_research_topics=8,
+        max_research_turns=3,
         runs_dir=tmp_path / "runs",
         evals_dir=tmp_path / "evals",
         timeouts=Timeouts(
