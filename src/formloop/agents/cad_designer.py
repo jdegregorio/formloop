@@ -46,7 +46,8 @@ class CadSourceResult(BaseModel):
         min_length=1,
         description=(
             "Full Python source for model.py. It must define "
-            "build_model(params: dict, context: object) and return one solid."
+            "build_model(params: dict, context: object) and return a build123d shape "
+            "(single-body or multi-body assemblies are both valid)."
         ),
     )
     revision_notes: str = Field(
@@ -422,7 +423,9 @@ Workflow every turn:
    - use ``apply_patch`` for targeted changes to model.py,
    - avoid rewriting the entire file unless necessary.
 3. Author a build123d Python module that defines
-   ``def build_model(params: dict, context: object)`` and returns a single solid.
+   ``def build_model(params: dict, context: object)`` and returns a valid build123d shape.
+   - Multi-body output is allowed when the spec implies an assembly or multiple parts
+     (for example hinges, bearings, or fastener stacks).
    - Default values inside ``build_model`` should match the spec exactly so that
      ``cad build`` succeeds with no overrides.
    - Consult the cheat sheet below for the full set of available primitives,
@@ -435,7 +438,7 @@ Workflow every turn:
      threads, gears). See the cheat sheet for exact import paths and
      constructor signatures.
    - Keep imports explicit and minimal; do not pull in uninstalled libraries.
-   - Keep the source small and readable — the goal is a correct minimum solid.
+   - Keep the source small and readable — the goal is a correct minimum model.
    - For arbitrary 2D polygon tooth profiles, prefer ``Face(Wire.make_polygon(...))``.
      Do not call ``Polyline`` directly inside ``BuildSketch``; in build123d it is a
      line-builder operation and will fail in sketch context.
