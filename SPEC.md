@@ -138,7 +138,7 @@ Formloop should standardize artifacts early.
 
 - STEP is the authoritative geometry artifact.
 - GLB is the primary presentation artifact.
-- rendered PNG views and a render sheet are shared review and UI artifacts.
+- rendered PNG views and a render sheet are shared review artifacts and optional UI/operator artifacts.
 - review outputs and eval outputs are persisted alongside revision data.
 
 Artifact bundles should remain easy to inspect after the fact so a run can be audited from prompt through delivered revision.
@@ -150,12 +150,18 @@ Detailed UI requirements live in [REQUIREMENTS_UI.md](REQUIREMENTS_UI.md).
 At a high level, the UI should present a design-review workspace built around:
 
 - chat
-- the normalized current spec
+- a concise normalized-spec plus latest-review summary
 - an interactive GLB viewer
-- render sheet and view images as secondary visual references
-- the latest review summary
 - artifact downloads
 - collapsed-by-default traceability surfaces
+
+The default UI layout is a three-pane workspace:
+
+- left half: chat thread and composer
+- top-right: concise normalized-spec plus latest-review summary
+- bottom-right: interactive GLB viewer
+
+Render sheet and per-view images are optional non-primary surfaces (for example downloadable artifacts or debug/operator affordances), not required default panes.
 
 The UI should consume a polling-friendly HTTP interface from the harness. Progress is surfaced through two complementary channels on the same append-only event stream:
 
@@ -163,6 +169,8 @@ The UI should consume a polling-friendly HTTP interface from the harness. Progre
 - **Narration events** (`kind == "narration"`) — short conversational status updates written by a dedicated lightweight Narrator agent (FLH-F-026). Each narration carries a coarse `phase` tag (`plan` / `research` / `revision` / `review` / `final` / `failure`) and answers what just finished, what's starting next, and why when it's informative. The latest narration is also surfaced as `latest_narration` on the run snapshot so polling clients don't need to scan the event tail.
 
 The UI renders the latest narration as a de-emphasized line between the operator's last message and the agent's eventual final answer — like a reasoning-trace component. As new narrations arrive, the previous one collapses into history; the operator can expand a "show trace" affordance to see the full sequence. The `formloop run` CLI mirrors this behavior in the terminal: latest narration in place above the next final block, structured milestones dimmed, with `--quiet` and `--verbose` flags to control verbosity (FLH-F-027).
+
+UI trace labels should prefer stable event semantics (phase + milestone + narration) over internal role naming so UX remains consistent when harness internals evolve.
 
 ### CLI Responsibilities
 
