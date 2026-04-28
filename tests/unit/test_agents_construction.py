@@ -77,6 +77,7 @@ def test_cad_designer_is_source_only(profile: Profile, tmp_path) -> None:
     assert "py_gearworks" in agent.instructions
     assert "bd_vslot" not in agent.instructions
     assert "BUILD123D ECOSYSTEM CHEAT SHEET" in agent.instructions
+    assert "Multi-body output is allowed" in agent.instructions
 
 
 def test_reviewer_and_judge_modes(profile: Profile) -> None:
