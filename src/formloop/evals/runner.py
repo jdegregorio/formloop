@@ -19,6 +19,10 @@ from ..sdk_messages import build_single_user_multimodal_message
 from .dataset import EvalCase, load_cases, resolve_dataset_path
 
 DEFAULT_WORKERS = 5
+SERIALIZATION_REASON = (
+    "parallel case execution is temporarily disabled because run logger isolation "
+    "is not process-safe yet"
+)
 STAGE_RUN_STARTED = "run_started"
 STAGE_REVISION_DELIVERED = "revision_delivered"
 STAGE_BUILD_ARTIFACTS_AVAILABLE = "build_artifacts_available"
@@ -183,7 +187,8 @@ async def run_eval_batch(
 ) -> Path:
     dataset_path = resolve_dataset_path(dataset_path)
     cases = load_cases(dataset_path)
-    workers = max(1, workers)
+    requested_workers = max(1, workers)
+    workers = 1
     batch_name = batch_name or datetime.utcnow().strftime("batch-%Y%m%d-%H%M%S")
     batch_dir = _batch_dir(config, batch_name)
     # Record "latest" pointer for easy reporting.
@@ -241,7 +246,9 @@ async def run_eval_batch(
         {
             "batch_name": batch_name,
             "dataset": str(dataset_path),
+            "requested_workers": requested_workers,
             "workers": workers,
+            "worker_warning": SERIALIZATION_REASON if requested_workers > workers else None,
             "reference_images_enabled": reference_images_enabled,
             "effective_runtime": effective_runtime,
             "aggregate": _aggregate(batch_summary),

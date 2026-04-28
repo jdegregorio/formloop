@@ -67,7 +67,7 @@ def _successful_record(case_id: str) -> dict[str, Any]:
 
 
 @pytest.mark.asyncio
-async def test_run_eval_batch_honors_worker_limit_and_preserves_order(
+async def test_run_eval_batch_serializes_case_execution_and_preserves_order(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = _config(tmp_path)
@@ -99,9 +99,11 @@ async def test_run_eval_batch_honors_worker_limit_and_preserves_order(
     )
 
     summary = json.loads(summary_path.read_text())
-    assert summary["workers"] == 2
+    assert summary["requested_workers"] == 2
+    assert summary["workers"] == 1
+    assert "parallel case execution is temporarily disabled" in summary["worker_warning"]
     assert [case["case_id"] for case in summary["cases"]] == [f"case_{i}" for i in range(5)]
-    assert max_active == 2
+    assert max_active == 1
 
 
 @pytest.mark.asyncio

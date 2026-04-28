@@ -46,7 +46,14 @@ def render_report(config: HarnessConfig, batch: str) -> Path:
     lines: list[str] = []
     lines.append(f"# Eval report — {summary['batch_name']}\n")
     lines.append(f"- Dataset: `{summary['dataset']}`")
-    lines.append(f"- Workers: `{summary.get('workers', 'n/a')}`")
+    requested_workers = summary.get("requested_workers")
+    effective_workers = summary.get("workers", "n/a")
+    if requested_workers is None:
+        lines.append(f"- Workers: `{effective_workers}`")
+    else:
+        lines.append(f"- Workers: requested `{requested_workers}`, effective `{effective_workers}`")
+    if summary.get("worker_warning"):
+        lines.append(f"- Worker warning: {summary['worker_warning']}")
     lines.append(f"- Reference images: `{summary.get('reference_images_enabled', 'n/a')}`")
     runtime = summary.get("effective_runtime") or {}
     if runtime:
