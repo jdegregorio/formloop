@@ -200,11 +200,10 @@ Formloop owns the dataset and benchmark layer.
 
 Each eval case should carry the minimum information needed for repeatable benchmarking:
 
+- case ID
 - prompt
-- normalized spec
 - ground-truth STEP
 - optional reference image
-- tags
 
 Each eval run should produce:
 
@@ -213,6 +212,11 @@ Each eval run should produce:
 - a short summary
 - per-case artifacts
 - aggregate reporting outputs
+- generation, artifact-availability, compare-completion, and judge-completion rates
+
+Eval batches may run cases concurrently with a bounded worker count. Reference
+images are used by default when a case defines one, but the operator can disable
+them for a batch to measure their effect on output quality.
 
 Formloop owns eval orchestration, scoring policy, aggregation, and failure surfacing even when deterministic geometry operations come from `cad-cli`.
 

@@ -16,8 +16,7 @@ are required grounding signals. Treat the judgment as an eval report, not a
 revision handoff.
 
 Inputs include:
-- Case prompt + normalized spec.
-- Delivered inspect summary.
+- Case prompt.
 - Deterministic comparison metrics vs ground-truth STEP.
 - Render sheet image.
 - Optional case reference image.

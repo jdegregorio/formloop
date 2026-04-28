@@ -28,6 +28,17 @@ def register(eval_app: typer.Typer, resolve_config: Callable[[], HarnessConfig])
         ] = None,
         batch_name: Annotated[str | None, typer.Option("--batch-name")] = None,
         max_revisions: Annotated[int | None, typer.Option("--max-revisions")] = None,
+        workers: Annotated[
+            int,
+            typer.Option("--workers", help="Maximum number of eval cases to run in parallel."),
+        ] = 5,
+        no_reference_images: Annotated[
+            bool,
+            typer.Option(
+                "--no-reference-images",
+                help="Ignore case reference images even when the dataset defines them.",
+            ),
+        ] = False,
         role_model: Annotated[
             list[str] | None,
             typer.Option("--role-model", help="Per-role model override as ROLE=MODEL. Repeatable."),
@@ -59,6 +70,8 @@ def register(eval_app: typer.Typer, resolve_config: Callable[[], HarnessConfig])
                 effort=effort,
                 batch_name=batch_name,
                 max_revisions=max_revisions,
+                workers=workers,
+                reference_images_enabled=not no_reference_images,
                 role_model_overrides=role_model_overrides,
                 role_reasoning_overrides=role_reasoning_overrides,
             )
