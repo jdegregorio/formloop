@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from formloop.schemas import (
     ArtifactEntry,
@@ -21,7 +22,9 @@ from formloop.schemas import (
     JudgeOutput,
     ProgressEvent,
     ProgressEventKind,
+    ReferenceImageUploadResponse,
     ReviewDecision,
+    ReviewOutcome,
     ReviewSummary,
     Revision,
     RevisionTrigger,
@@ -73,15 +76,51 @@ def test_artifact_manifest_entries() -> None:
 def test_review_summary_decision_enum() -> None:
     rs = ReviewSummary(
         decision=ReviewDecision.pass_,
-        confidence=0.92,
+        outcome=ReviewOutcome.pass_,
+        summary="The cube matches the requested geometry.",
+        next_step="Deliver this design.",
         key_findings=["looks right"],
-        feature_checklist=[{"feature": "overall silhouette", "status": "pass"}],
     )
+    assert rs.schema_version == 2
     assert rs.decision is ReviewDecision.pass_
-    assert rs.feature_checklist[0]["feature"] == "overall silhouette"
     # Revise requires concrete instructions in practice; schema doesn't enforce
     # but the field defaults to "".
     assert rs.revision_instructions == ""
+
+
+def test_review_summary_migrates_v1_json() -> None:
+    restored = ReviewSummary.model_validate(
+        {
+            "schema_version": 1,
+            "decision": "revise",
+            "confidence": 0.92,
+            "key_findings": ["hole pattern is off"],
+            "suspect_or_missing_features": ["missing countersink"],
+            "suspect_dimensions_to_recheck": ["hole spacing"],
+            "revision_instructions": "Move the holes outward.",
+        }
+    )
+
+    assert restored.schema_version == 2
+    assert restored.outcome is ReviewOutcome.revise
+    assert restored.summary == "hole pattern is off"
+    assert restored.next_step == "Move the holes outward."
+    assert restored.key_findings[:3] == [
+        "hole pattern is off",
+        "missing countersink",
+        "hole spacing",
+    ]
+
+
+def test_review_summary_v2_rejects_confidence() -> None:
+    with pytest.raises(ValidationError):
+        ReviewSummary(
+            decision=ReviewDecision.pass_,
+            outcome=ReviewOutcome.pass_,
+            summary="Looks correct.",
+            next_step="Deliver it.",
+            confidence=0.8,
+        )
 
 
 def test_progress_event_kinds_cover_lifecycle() -> None:
@@ -165,6 +204,18 @@ def test_run_create_response_fields() -> None:
     assert r.status_url.endswith("/snapshot")
 
 
+def test_reference_image_upload_response_fields() -> None:
+    r = ReferenceImageUploadResponse(
+        upload_id="u",
+        reference_image="/tmp/ref.png",
+        filename="ref.png",
+        content_type="image/png",
+        size_bytes=12,
+    )
+    assert r.reference_image.endswith(".png")
+    assert r.content_type == "image/png"
+
+
 def test_checked_in_schemas_match_pydantic() -> None:
     """schemas/*.schema.json must stay in sync with the Pydantic mirrors."""
     repo = Path(__file__).resolve().parents[2]
@@ -180,7 +231,7 @@ def test_checked_in_schemas_match_pydantic() -> None:
 def test_all_checked_in_schemas_are_valid_json() -> None:
     repo = Path(__file__).resolve().parents[2]
     files = sorted((repo / "schemas").glob("*.schema.json"))
-    assert len(files) == 10, f"expected 10 schemas, got {len(files)}"
+    assert len(files) == 11, f"expected 11 schemas, got {len(files)}"
     for f in files:
         data = json.loads(f.read_text())
         assert data["$schema"].startswith("https://json-schema.org/")

@@ -77,6 +77,18 @@ Validate:
 - the surfaced response or UI summary
 - the linked artifact references or review outputs
 
+## Web app validation
+
+When changing UI or frontend behavior:
+
+1. Start the dev server unless it is already running.
+2. Open the relevant route in the Codex in-app browser or Playwright.
+3. Check desktop and mobile widths.
+4. Inspect visible errors, layout overflow, broken interactions, and console errors.
+5. Make the smallest fix that addresses the issue.
+6. Re-open or refresh the page and verify the fix visually.
+7. Run `lint` and `build` commands before finalizing if the change is non-trivial.
+
 ### For agent orchestration changes
 
 Validate:

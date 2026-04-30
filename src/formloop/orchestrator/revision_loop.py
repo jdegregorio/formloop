@@ -527,7 +527,11 @@ async def revision_loop_phase(
                 context={
                     "prior_decision": prior_review.get("decision"),
                     "prior_key_findings": (prior_review.get("key_findings") or [])[:3],
-                    "revision_instructions": (prior_review.get("revision_instructions") or [])[:3],
+                    "revision_instructions": (
+                        [prior_review["revision_instructions"]]
+                        if prior_review.get("revision_instructions")
+                        else []
+                    ),
                 },
                 fallback=f"starting revision attempt {attempt}",
             )

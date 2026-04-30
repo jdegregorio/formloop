@@ -45,8 +45,8 @@ async def review_phase(
         "review_focus": {
             "primary_modality": "visual",
             "required_images": ["render_sheet", "reference_image_if_present"],
-            "feature_checklist": (
-                "Cover all meaningful spec features with flexible checklist items."
+            "summary_style": (
+                "Return one concise summary, one clear next_step, and brief key_findings."
             ),
         },
     }
@@ -65,19 +65,21 @@ async def review_phase(
     fresh = ctx.load_run(run.run_name)
     ctx.attach_review(fresh, revision.revision_name, review)
     logger.info(
-        "review decision: revision=%s decision=%s confidence=%s",
+        "review decision: revision=%s decision=%s outcome=%s",
         revision.revision_name,
         review.decision.value,
-        review.confidence,
+        review.outcome.value,
     )
     ctx.emit(
         run.run_name,
         ProgressEventKind.review_completed,
-        message=f"review decision: {review.decision.value}",
+        message=f"review outcome: {review.outcome.value}",
         data={
             "revision": revision.revision_name,
             "decision": review.decision.value,
-            "confidence": review.confidence,
+            "outcome": review.outcome.value,
+            "summary": review.summary,
+            "next_step": review.next_step,
         },
     )
     await ctx.narrate(
@@ -90,22 +92,16 @@ async def review_phase(
             else "iterate on the design"
         ),
         why="",
-        signals={"decision": review.decision.value, "confidence": review.confidence},
+        signals={"decision": review.decision.value, "outcome": review.outcome.value},
         context={
             "decision": review.decision.value,
-            "confidence": review.confidence,
+            "outcome": review.outcome.value,
+            "summary": review.summary,
+            "next_step": review.next_step,
             "key_findings": list(review.key_findings or [])[:4],
-            "suspect_features": list(getattr(review, "suspect_or_missing_features", None) or [])[
-                :4
-            ],
-            "suspect_dimensions": list(
-                getattr(review, "suspect_dimensions_to_recheck", None) or []
-            )[:4],
-            "revision_instructions": list(
-                [getattr(review, "revision_instructions", "")]
-                if getattr(review, "revision_instructions", "")
-                else []
-            )[:1],
+            "revision_instructions": (
+                [review.revision_instructions] if review.revision_instructions else []
+            ),
         },
         fallback=fallback_review(review),
     )

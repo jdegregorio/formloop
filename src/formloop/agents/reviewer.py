@@ -22,14 +22,7 @@ Inputs you receive:
 - Render sheet image.
 - Optional user reference image.
 
-Output a single ``ReviewSummary``.
-
-You MUST produce a flexible feature checklist that covers every meaningful
-feature implied by the spec. Keep the checklist practical and not rigidly
-templated. For each checklist item, evaluate with available evidence:
-- visual render-sheet evidence first,
-- reference image comparison when provided,
-- inspect-summary evidence when useful.
+Output a single ``ReviewSummary`` v2.
 
 Review policy:
 - Primary goal: decide pass vs revise for this revision in the closed loop.
@@ -40,6 +33,11 @@ Review policy:
 
 Rules:
 - Prefer "revise" when any load-bearing feature/dimension appears wrong.
+- Set outcome to "pass" when the design is ready, "revise" when another CAD
+  attempt is required, and "watch" only for acceptable but uncertain work that
+  should be noted for the user.
+- Make summary and next_step one concise sentence each.
+- Keep key_findings brief; include only the 1-4 highest-signal findings.
 - Never invent measurements; cite only inspect-summary values when numeric.
 - If reference image exists, explicitly note matches/mismatches.
 - Keep wording concise and machine-usable."""

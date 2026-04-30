@@ -43,7 +43,7 @@ from formloop.runtime.cad_cli import (
     CadInspectResult,
     CadRenderResult,
 )
-from formloop.schemas import ProgressEventKind, ReviewDecision
+from formloop.schemas import ProgressEventKind, ReviewDecision, ReviewOutcome
 from formloop.schemas.review_summary import ReviewSummary
 
 pytestmark = pytest.mark.asyncio
@@ -166,7 +166,9 @@ def _install_runner_stub(monkeypatch) -> None:
             return _FakeResult(
                 final_output=ReviewSummary(
                     decision=ReviewDecision.pass_,
-                    confidence=0.9,
+                    outcome=ReviewOutcome.pass_,
+                    summary="The cube dimensions and render are acceptable.",
+                    next_step="Deliver this design.",
                     key_findings=["cube dimensions and render are acceptable"],
                 )
             )

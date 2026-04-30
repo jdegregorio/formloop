@@ -11,7 +11,8 @@ from .artifact_manifest import ArtifactEntry, ArtifactManifest
 from .deterministic_metrics import DeterministicMetrics
 from .judge_output import JudgeOutput
 from .progress_event import ProgressEvent, ProgressEventKind
-from .review_summary import ReviewDecision, ReviewSummary
+from .reference_upload import ReferenceImageUploadResponse
+from .review_summary import ReviewDecision, ReviewOutcome, ReviewSummary
 from .revision import Revision, RevisionTrigger
 from .run import (
     AgentAnswer,
@@ -34,7 +35,9 @@ __all__ = [
     "JudgeOutput",
     "ProgressEvent",
     "ProgressEventKind",
+    "ReferenceImageUploadResponse",
     "ReviewDecision",
+    "ReviewOutcome",
     "ReviewSummary",
     "Revision",
     "RevisionTrigger",

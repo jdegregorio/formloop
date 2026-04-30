@@ -23,6 +23,7 @@ from formloop.schemas import (
     ProgressEvent,
     ProgressEventKind,
     ReviewDecision,
+    ReviewOutcome,
     ReviewSummary,
     RevisionTrigger,
 )
@@ -79,7 +80,13 @@ def _seed_run_with_revision(store: RunStore, tmp_path: Path):
     store.attach_review(
         store.load_run(run.run_name),
         revision.revision_name,
-        ReviewSummary(decision=ReviewDecision.pass_, confidence=0.95, key_findings=["ok"]),
+        ReviewSummary(
+            decision=ReviewDecision.pass_,
+            outcome=ReviewOutcome.pass_,
+            summary="The seeded geometry passed review.",
+            next_step="Deliver this design.",
+            key_findings=["ok"],
+        ),
     )
     store.append_event(
         run.run_name,
@@ -115,6 +122,10 @@ async def test_snapshot_and_events_and_artifacts(tmp_path: Path) -> None:
         assert r.status_code == 200
         snap = r.json()
         assert snap["run_name"] == run.run_name
+        assert snap["input_summary"] == "seeded"
+        assert snap["assumptions"] == []
+        assert snap["final_answer"] is None
+        assert snap["delivered_revision_name"] is None
         assert snap["latest_review_decision"] == "pass"
         # FLH-F-026 — latest narration is surfaced via /snapshot.
         assert snap["latest_narration"] == "we settled on the cube"
@@ -154,10 +165,70 @@ async def test_snapshot_and_events_and_artifacts(tmp_path: Path) -> None:
         r = await client.get(f"/runs/{run.run_name}/review-summary")
         assert r.status_code == 200
         assert r.json()["decision"] == "pass"
+        assert r.json()["schema_version"] == 2
+        assert r.json()["outcome"] == "pass"
+        assert "confidence" not in r.json()
 
         # unknown run
         r = await client.get("/runs/run-9999/snapshot")
         assert r.status_code == 404
+
+
+async def test_reference_image_upload_validation(tmp_path: Path) -> None:
+    config = _stub_config(tmp_path)
+    app = create_app(config)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.post(
+            "/reference-images",
+            files={"file": ("ref.png", b"\x89PNG\r\n\x1a\npng-data", "image/png")},
+        )
+        assert r.status_code == 201
+        payload = r.json()
+        assert payload["content_type"] == "image/png"
+        assert payload["reference_image"].endswith(".png")
+        assert Path(payload["reference_image"]).is_file()
+
+        bad = await client.post(
+            "/reference-images",
+            files={"file": ("ref.gif", b"GIF89a", "image/gif")},
+        )
+        assert bad.status_code == 415
+
+
+async def test_create_run_accepts_uploaded_reference_image(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _stub_config(tmp_path)
+
+    async def fake_continue_run(self, **kwargs):  # noqa: ANN001, ARG001
+        return {"status": "succeeded"}
+
+    api_app = importlib.import_module("formloop.api.app")
+    monkeypatch.setattr(api_app.RunDriver, "continue_run", fake_continue_run)
+    app = create_app(config)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        upload = await client.post(
+            "/reference-images",
+            files={"file": ("ref.jpg", b"\xff\xd8\xffjpeg-data", "image/jpeg")},
+        )
+        assert upload.status_code == 201
+        reference_image = upload.json()["reference_image"]
+
+        r = await client.post(
+            "/runs",
+            json={
+                "prompt": "make this bracket",
+                "profile": "dev_test",
+                "reference_image": reference_image,
+            },
+        )
+        assert r.status_code == 201
+        run = app.state.store.load_run(r.json()["run_name"])
+        assert run.reference_image == reference_image
 
 
 async def test_create_run_accepts_role_overrides_and_exposes_effective_runtimes(
@@ -196,3 +267,34 @@ async def test_create_run_accepts_role_overrides_and_exposes_effective_runtimes(
         assert snap["effective_role_runtimes"]["cad_designer"]["model"] == "cad-api"
         assert snap["effective_role_runtimes"]["manager_plan"]["model"] == "global-api"
         assert snap["effective_role_runtimes"]["reviewer"]["reasoning"] == "medium"
+
+
+async def test_serves_built_ui_assets(tmp_path: Path) -> None:
+    config = _stub_config(tmp_path)
+    dist = tmp_path / "web" / "dist"
+    assets = dist / "assets"
+    brand = dist / "brand"
+    assets.mkdir(parents=True)
+    brand.mkdir()
+    (dist / "index.html").write_text("<!doctype html><div id=\"root\"></div>")
+    (assets / "app.js").write_text("console.log('ui')")
+    (brand / "formloop-mark.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    app = create_app(config)
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        index = await client.get("/")
+        assert index.status_code == 200
+        assert "root" in index.text
+
+        asset = await client.get("/assets/app.js")
+        assert asset.status_code == 200
+        assert "ui" in asset.text
+
+        brand_asset = await client.get("/brand/formloop-mark.png")
+        assert brand_asset.status_code == 200
+        assert brand_asset.headers["content-type"] == "image/png"
+
+        nested = await client.get("/design/run-0001")
+        assert nested.status_code == 200
+        assert "root" in nested.text

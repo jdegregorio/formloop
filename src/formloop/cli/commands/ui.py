@@ -18,7 +18,7 @@ from ..ui_daemon import is_running, log_file_path, pid_file_path, port_open
 def register(ui_app: typer.Typer, resolve_config: Callable[[], HarnessConfig]) -> None:
     @ui_app.command("start")
     def ui_start_cmd() -> None:
-        """Launch the polling HTTP API as a detached daemon."""
+        """Launch the same-origin browser UI and polling HTTP API daemon."""
 
         config = resolve_config()
         pid_file = pid_file_path(config)
