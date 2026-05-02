@@ -24,10 +24,17 @@ class SnapshotProjector:
             run_id=run.run_id,
             run_name=run.run_name,
             status=run.status.value if isinstance(run.status, RunStatus) else str(run.status),
+            input_summary=run.input_summary,
+            status_detail=run.status_detail,
             current_spec=run.current_spec,
             current_revision_name=run.current_revision_id,
+            delivered_revision_name=(
+                run.final_answer.delivered_revision_name if run.final_answer else None
+            ),
             revisions=list(run.revisions),
+            assumptions=list(run.assumptions),
             research_findings=run.research_findings,
+            final_answer=run.final_answer,
             effective_role_runtimes={
                 role: {"model": runtime.model, "reasoning": runtime.reasoning}
                 for role, runtime in run.effective_runtime.roles.items()

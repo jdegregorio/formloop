@@ -40,6 +40,29 @@ and `py_gearworks` are always visible.
 
 Run artifacts land under `var/runs/run-NNNN/`.
 
+## Browser UI
+
+The v1 web UI lives in `web/` and is built as a React/Vite TypeScript app.
+During development, run it beside the polling API:
+
+```bash
+uv run uvicorn formloop.api.app:app --host 127.0.0.1 --port 8765
+npm --prefix web install
+npm --prefix web run dev
+```
+
+For the same-origin operator surface, build the UI and start the Formloop API:
+
+```bash
+npm --prefix web run build
+uv run formloop ui start
+```
+
+`formloop ui start` serves the API and the built `web/dist` assets from the
+same host/port. The UI stores one browser-local design thread, polls run
+snapshots/events, renders the latest narration inline, keeps trace details
+collapsed by default, and uses the latest GLB as the primary geometry surface.
+
 ## Build123D part-library support in CAD generation
 
 The CAD Designer agent carries a comprehensive cheat sheet covering

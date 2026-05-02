@@ -196,10 +196,10 @@ The first pass should fully define the core contracts below and keep the rest in
 - Purpose: the concise structured output of normal design review for one revision.
 - Minimum fields:
   - `decision`
-  - `confidence`
+  - `outcome`
+  - `summary`
+  - `next_step`
   - `key_findings`
-  - `suspect_or_missing_features`
-  - `suspect_dimensions_to_recheck`
   - `revision_instructions`
 
 `run-snapshot`

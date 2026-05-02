@@ -7,6 +7,15 @@
       ],
       "title": "ReviewDecision",
       "type": "string"
+    },
+    "ReviewOutcome": {
+      "enum": [
+        "revise",
+        "watch",
+        "pass"
+      ],
+      "title": "ReviewOutcome",
+      "type": "string"
     }
   },
   "$id": "formloop/review-summary",
@@ -14,23 +23,8 @@
   "additionalProperties": false,
   "description": "Concise structured output of normal design review for one revision.",
   "properties": {
-    "confidence": {
-      "maximum": 1.0,
-      "minimum": 0.0,
-      "title": "Confidence",
-      "type": "number"
-    },
     "decision": {
       "$ref": "#/$defs/ReviewDecision"
-    },
-    "feature_checklist": {
-      "description": "Flexible per-feature review checklist entries. Keep structure light-weight.",
-      "items": {
-        "additionalProperties": true,
-        "type": "object"
-      },
-      "title": "Feature Checklist",
-      "type": "array"
     },
     "key_findings": {
       "items": {
@@ -39,17 +33,14 @@
       "title": "Key Findings",
       "type": "array"
     },
-    "reference_image_notes": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Reference Image Notes"
+    "next_step": {
+      "description": "One concise user-facing sentence describing what should happen next.",
+      "minLength": 1,
+      "title": "Next Step",
+      "type": "string"
+    },
+    "outcome": {
+      "$ref": "#/$defs/ReviewOutcome"
     },
     "revision_instructions": {
       "default": "",
@@ -58,29 +49,23 @@
       "type": "string"
     },
     "schema_version": {
-      "default": 1,
-      "minimum": 1,
+      "const": 2,
+      "default": 2,
       "title": "Schema Version",
       "type": "integer"
     },
-    "suspect_dimensions_to_recheck": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Suspect Dimensions To Recheck",
-      "type": "array"
-    },
-    "suspect_or_missing_features": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Suspect Or Missing Features",
-      "type": "array"
+    "summary": {
+      "description": "One concise user-facing sentence summarizing what the review found.",
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
     }
   },
   "required": [
     "decision",
-    "confidence"
+    "outcome",
+    "summary",
+    "next_step"
   ],
   "title": "ReviewSummary",
   "type": "object"

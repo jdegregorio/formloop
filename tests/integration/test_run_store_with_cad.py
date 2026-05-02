@@ -13,6 +13,7 @@ from formloop.runtime.cad_cli import cad_build, cad_inspect_summary, cad_render
 from formloop.schemas import (
     EffectiveRuntime,
     ReviewDecision,
+    ReviewOutcome,
     ReviewSummary,
     RevisionTrigger,
 )
@@ -84,7 +85,9 @@ def test_persist_revision_from_real_cad(
     # Attach review and verify snapshot reflects decision.
     review = ReviewSummary(
         decision=ReviewDecision.pass_,
-        confidence=0.95,
+        outcome=ReviewOutcome.pass_,
+        summary="The cube matches the request.",
+        next_step="Deliver this design.",
         key_findings=["Cube matches request."],
     )
     store.attach_review(run, revision.revision_name, review)

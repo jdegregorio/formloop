@@ -21,7 +21,13 @@ from formloop.runtime.cad_cli import (
     CadRenderResult,
 )
 from formloop.runtime.subprocess import CliError
-from formloop.schemas import EffectiveRuntime, ProgressEvent, ProgressEventKind, ReviewDecision
+from formloop.schemas import (
+    EffectiveRuntime,
+    ProgressEvent,
+    ProgressEventKind,
+    ReviewDecision,
+    ReviewOutcome,
+)
 from formloop.schemas.review_summary import ReviewSummary
 from formloop.store import RunStore
 
@@ -204,7 +210,9 @@ def _fake_render(*, glb_path: Path, output_dir: Path, **kwargs) -> CadRenderResu
 async def _passing_review(*args, **kwargs) -> ReviewSummary:
     return ReviewSummary(
         decision=ReviewDecision.pass_,
-        confidence=0.9,
+        outcome=ReviewOutcome.pass_,
+        summary="The model looks good.",
+        next_step="Deliver this design.",
         key_findings=["looks good"],
     )
 
@@ -212,7 +220,9 @@ async def _passing_review(*args, **kwargs) -> ReviewSummary:
 async def _revising_review(*args, **kwargs) -> ReviewSummary:
     return ReviewSummary(
         decision=ReviewDecision.revise,
-        confidence=0.4,
+        outcome=ReviewOutcome.revise,
+        summary="The dimensions are off.",
+        next_step="Revise the design.",
         key_findings=["dimensions off"],
         revision_instructions="tighten the fit",
     )

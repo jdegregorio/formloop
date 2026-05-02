@@ -7,17 +7,27 @@ from __future__ import annotations
 
 import asyncio
 import mimetypes
+import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from ..config.env import load_env_local
 from ..config.profiles import HarnessConfig, load_config
 from ..orchestrator import RunDriver
 from ..orchestrator.run_driver import DriveRequest
-from ..schemas import RunCreateRequest, RunCreateResponse
+from ..schemas import (
+    ReferenceImageUploadResponse,
+    ReviewSummary,
+    RunCreateRequest,
+    RunCreateResponse,
+)
 from ..store import RunStore
+
+MAX_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024
+REFERENCE_UPLOAD_DIR = Path("var/uploads/reference-images")
 
 
 def create_app(config: HarnessConfig | None = None) -> FastAPI:
@@ -112,12 +122,48 @@ def create_app(config: HarnessConfig | None = None) -> FastAPI:
         for rev in sorted(rev_dir.iterdir(), reverse=True):
             rs = rev / "review-summary.json"
             if rs.is_file():
-                return JSONResponse(_read_json(rs))
+                try:
+                    review = ReviewSummary.model_validate_json(rs.read_text())
+                except Exception:
+                    raise HTTPException(500, detail="review summary is invalid") from None
+                return JSONResponse(review.model_dump(mode="json"))
         raise HTTPException(404, detail="no review summary yet")
+
+    @app.post(
+        "/reference-images",
+        response_model=ReferenceImageUploadResponse,
+        status_code=201,
+    )
+    async def upload_reference_image(
+        file: UploadFile = File(...),  # noqa: B008
+    ) -> ReferenceImageUploadResponse:
+        content = await file.read(MAX_REFERENCE_IMAGE_BYTES + 1)
+        if not content:
+            raise HTTPException(status_code=400, detail="reference image is empty")
+        if len(content) > MAX_REFERENCE_IMAGE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="reference image exceeds 10 MB",
+            )
+        content_type, ext = _validated_reference_image(content, file.content_type)
+        upload_id = str(uuid.uuid4())
+        upload_dir = cfg.repo_root / REFERENCE_UPLOAD_DIR
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        dest = upload_dir / f"{upload_id}{ext}"
+        dest.write_bytes(content)
+        return ReferenceImageUploadResponse(
+            upload_id=upload_id,
+            reference_image=str(dest),
+            filename=Path(file.filename or f"reference{ext}").name,
+            content_type=content_type,
+            size_bytes=len(content),
+        )
 
     @app.get("/healthz")
     def healthz() -> dict:
         return {"status": "ok", "runs_dir": str(cfg.runs_dir)}
+
+    _mount_ui(app, cfg.repo_root / "web" / "dist")
 
     return app
 
@@ -155,6 +201,63 @@ def _resolve_artifact(cfg: HarnessConfig, run_name: str, rev_name: str, role: st
         return base / _ROLE_PATHS[role]
     if role.startswith("view_"):
         return base / "views" / f"{role[len('view_') :]}.png"
+    return None
+
+
+def _validated_reference_image(content: bytes, content_type: str | None) -> tuple[str, str]:
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        detected_type, ext = "image/png", ".png"
+    elif content.startswith(b"\xff\xd8\xff"):
+        detected_type, ext = "image/jpeg", ".jpg"
+    else:
+        raise HTTPException(status_code=415, detail="reference image must be PNG or JPEG")
+    if content_type and content_type not in {"image/png", "image/jpeg", "image/jpg"}:
+        raise HTTPException(status_code=415, detail="reference image must be PNG or JPEG")
+    return detected_type, ext
+
+
+def _mount_ui(app: FastAPI, ui_dist: Path) -> None:
+    """Serve the built browser UI when ``web/dist`` exists.
+
+    REQ: FLU-D-001, FLU-D-004
+    """
+
+    assets_dir = ui_dist / "assets"
+    index = ui_dist / "index.html"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="ui-assets")
+
+    @app.get("/")
+    def ui_index() -> HTMLResponse:
+        if not index.is_file():
+            raise HTTPException(404, detail="UI build not found; run npm --prefix web run build")
+        return HTMLResponse(index.read_text(encoding="utf-8"))
+
+    @app.get("/{full_path:path}", include_in_schema=False, response_model=None)
+    def ui_spa_fallback(full_path: str):
+        first = full_path.split("/", 1)[0]
+        if first in {"runs", "reference-images", "healthz", "docs", "openapi.json"}:
+            raise HTTPException(404, detail="not found")
+        static_file = _resolve_ui_static_file(ui_dist, full_path)
+        if static_file is not None:
+            media_type, _ = mimetypes.guess_type(static_file.name)
+            return FileResponse(static_file, media_type=media_type)
+        if not index.is_file():
+            raise HTTPException(404, detail="UI build not found; run npm --prefix web run build")
+        return HTMLResponse(index.read_text(encoding="utf-8"))
+
+
+def _resolve_ui_static_file(ui_dist: Path, full_path: str) -> Path | None:
+    """Resolve a built UI public file without allowing path traversal."""
+
+    try:
+        root = ui_dist.resolve()
+        candidate = (root / full_path).resolve()
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    if candidate.is_file():
+        return candidate
     return None
 
 

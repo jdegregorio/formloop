@@ -1,5 +1,68 @@
 {
   "$defs": {
+    "AgentAnswer": {
+      "additionalProperties": false,
+      "description": "Final user-facing answer synthesized by the manager (FLH-F-002).",
+      "properties": {
+        "delivered_revision_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delivered Revision Name"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "AgentAnswer",
+      "type": "object"
+    },
+    "AssumptionRecord": {
+      "additionalProperties": false,
+      "description": "A manager-recorded assumption made when spec is ambiguous (FLH-F-020).",
+      "properties": {
+        "assumption": {
+          "title": "Assumption",
+          "type": "string"
+        },
+        "recorded_at": {
+          "title": "Recorded At",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "topic": {
+          "title": "Topic",
+          "type": "string"
+        }
+      },
+      "required": [
+        "topic",
+        "assumption"
+      ],
+      "title": "AssumptionRecord",
+      "type": "object"
+    },
     "ReviewDecision": {
       "enum": [
         "pass",
@@ -73,6 +136,13 @@
     "artifacts": {
       "$ref": "#/$defs/SnapshotArtifacts"
     },
+    "assumptions": {
+      "items": {
+        "$ref": "#/$defs/AssumptionRecord"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
     "current_revision_name": {
       "anyOf": [
         {
@@ -90,6 +160,18 @@
       "title": "Current Spec",
       "type": "object"
     },
+    "delivered_revision_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Delivered Revision Name"
+    },
     "effective_role_runtimes": {
       "additionalProperties": {
         "additionalProperties": {
@@ -100,8 +182,24 @@
       "title": "Effective Role Runtimes",
       "type": "object"
     },
+    "final_answer": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AgentAnswer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "generated_at": {
       "title": "Generated At",
+      "type": "string"
+    },
+    "input_summary": {
+      "default": "",
+      "title": "Input Summary",
       "type": "string"
     },
     "last_event_index": {
@@ -226,6 +324,18 @@
     "status": {
       "title": "Status",
       "type": "string"
+    },
+    "status_detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Status Detail"
     }
   },
   "required": [

@@ -12,10 +12,12 @@ from pathlib import Path
 import pytest
 
 from formloop.schemas import (
+    AgentAnswer,
     EffectiveRuntime,
     ProgressEvent,
     ProgressEventKind,
     ReviewDecision,
+    ReviewOutcome,
     ReviewSummary,
     RevisionTrigger,
 )
@@ -195,7 +197,9 @@ def test_attach_review_updates_snapshot(
     revision, _ = store.persist_revision(run, _make_bundle(tmp_path))
     review = ReviewSummary(
         decision=ReviewDecision.pass_,
-        confidence=0.9,
+        outcome=ReviewOutcome.pass_,
+        summary="The cube matches the request.",
+        next_step="Deliver this design.",
         key_findings=["Looks like a cube."],
     )
     store.attach_review(run, revision.revision_name, review)
@@ -205,6 +209,36 @@ def test_attach_review_updates_snapshot(
     assert snap.artifacts is not None
     assert snap.artifacts.step_path is not None
     assert len(snap.artifacts.view_paths) == 3
+
+
+def test_snapshot_accepts_legacy_review_summary_v1(
+    store: RunStore, effective_runtime: EffectiveRuntime, tmp_path: Path
+) -> None:
+    run, _ = store.create_run(input_summary="cube", effective_runtime=effective_runtime)
+    _, rev_layout = store.persist_revision(run, _make_bundle(tmp_path))
+    rev_layout.review_summary.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "decision": "revise",
+                "confidence": 0.8,
+                "key_findings": ["Hole spacing is off."],
+                "suspect_or_missing_features": [],
+                "suspect_dimensions_to_recheck": [],
+                "reference_image_notes": None,
+                "revision_instructions": "Move the holes outward.",
+            }
+        )
+    )
+    store.append_event(
+        run.run_name,
+        ProgressEvent(index=0, kind=ProgressEventKind.review_completed, message="reviewed"),
+    )
+
+    snap = store.load_snapshot(run.run_name)
+
+    assert snap.latest_review_decision == ReviewDecision.revise
+    assert snap.latest_review_summary_path == "revisions/rev-001/review-summary.json"
 
 
 def test_snapshot_tracks_last_event(store: RunStore, effective_runtime: EffectiveRuntime) -> None:
@@ -255,6 +289,22 @@ def test_snapshot_without_revision_or_review_is_sparse(
     assert snap.artifacts.glb_path is None
     assert snap.latest_review_decision is None
     assert snap.latest_review_summary_path is None
+
+
+def test_snapshot_exposes_ui_summary_fields(
+    store: RunStore, effective_runtime: EffectiveRuntime
+) -> None:
+    run, _ = store.create_run(input_summary="make a hinge", effective_runtime=effective_runtime)
+    run.status_detail = "waiting for review"
+    run.final_answer = AgentAnswer(text="Delivered rev-001.", delivered_revision_name="rev-001")
+    store.save_run(run)
+
+    snap = store.load_snapshot(run.run_name)
+    assert snap.input_summary == "make a hinge"
+    assert snap.status_detail == "waiting for review"
+    assert snap.final_answer is not None
+    assert snap.final_answer.text == "Delivered rev-001."
+    assert snap.delivered_revision_name == "rev-001"
 
 
 def test_snapshot_with_revision_without_review_has_artifacts_only(

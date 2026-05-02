@@ -1,0 +1,43 @@
+{
+  "$id": "formloop/reference-image-upload-response",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Server-side reference-image handle returned after upload validation.",
+  "properties": {
+    "content_type": {
+      "title": "Content Type",
+      "type": "string"
+    },
+    "filename": {
+      "title": "Filename",
+      "type": "string"
+    },
+    "reference_image": {
+      "title": "Reference Image",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "size_bytes": {
+      "title": "Size Bytes",
+      "type": "integer"
+    },
+    "upload_id": {
+      "title": "Upload Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "upload_id",
+    "reference_image",
+    "filename",
+    "content_type",
+    "size_bytes"
+  ],
+  "title": "ReferenceImageUploadResponse",
+  "type": "object"
+}

@@ -124,9 +124,9 @@ What to lift from ``context`` (non-exhaustive):
 - ``research_findings`` — quote the takeaway, not the methodology.
 - ``revision_notes`` / ``dimensions`` / ``known_risks`` — pick the
   detail that matters most for the reader.
-- ``key_findings`` / ``suspect_features`` / ``revision_instructions`` —
+- ``summary`` / ``next_step`` / ``key_findings`` / ``revision_instructions`` —
   say what the reviewer flagged, not that they reviewed.
-- ``confidence`` and ``decision`` — quote if notable.
+- ``outcome`` and ``decision`` — quote if notable.
 
 Hard rules:
 - Do NOT mention internal identifiers, file paths, run names, or

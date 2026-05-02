@@ -323,10 +323,10 @@ class EventRenderer:
             return
         if kind is ProgressEventKind.review_completed:
             decision = event.data.get("decision") or "?"
-            confidence = event.data.get("confidence")
+            outcome = event.data.get("outcome")
             text = f"review decision: {decision}"
-            if isinstance(confidence, int | float):
-                text += f" (confidence {confidence:.2f})"
+            if isinstance(outcome, str) and outcome:
+                text += f" ({outcome})"
             decorated = (
                 self._color(GREEN, text) if decision == "pass" else self._color(YELLOW, text)
             )

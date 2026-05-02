@@ -11,6 +11,7 @@ from pydantic import Field
 
 from ._common import SchemaModel, utcnow_iso
 from .review_summary import ReviewDecision
+from .run import AgentAnswer, AssumptionRecord
 
 
 class SnapshotArtifacts(SchemaModel):
@@ -26,13 +27,18 @@ class RunSnapshot(SchemaModel):
     run_id: str
     run_name: str
     status: str
+    input_summary: str = ""
+    status_detail: str | None = None
     generated_at: str = Field(default_factory=utcnow_iso)
 
     current_spec: dict[str, Any] = Field(default_factory=dict)
     current_revision_name: str | None = None
+    delivered_revision_name: str | None = None
     revisions: list[str] = Field(default_factory=list)
+    assumptions: list[AssumptionRecord] = Field(default_factory=list)
     research_findings: list[dict[str, Any]] = Field(default_factory=list)
     effective_role_runtimes: dict[str, dict[str, str]] = Field(default_factory=dict)
+    final_answer: AgentAnswer | None = None
 
     latest_review_decision: ReviewDecision | None = None
     latest_review_summary_path: str | None = None
